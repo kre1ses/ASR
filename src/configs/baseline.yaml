@@ -20,6 +20,10 @@ loss_function:
   _target_: src.loss.CTCLossWrapper
 text_encoder:
   _target_: src.text_encoder.CTCTextEncoder
+  bpe_use: False
+  lm_use: False
+  vocab_size: 128
+  beam_size: 5
 trainer:
   log_step: 50
   n_epochs: 50
@@ -33,3 +37,5 @@ trainer:
   early_stop: ${trainer.n_epochs} # epochs for early stopping
   save_dir: "saved"
   seed: 1
+  bpe_use: ${text_encoder.bpe_use}
+  bpe_use: ${text_encoder.lm_use}

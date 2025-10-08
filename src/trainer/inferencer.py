@@ -2,6 +2,7 @@ import torch
 from tqdm.auto import tqdm
 
 from src.metrics.tracker import MetricTracker
+from src.metrics.utils import calc_cer, calc_wer
 from src.trainer.base_trainer import BaseTrainer
 
 
@@ -136,22 +137,73 @@ class Inferencer(BaseTrainer):
         # Some saving logic. This is an example
         # Use if you need to save predictions on disk
 
-        batch_size = batch["logits"].shape[0]
-        current_id = batch_idx * batch_size
+        log_probs = outputs["log_probs"]
+        log_probs_length = outputs["log_probs_length"]
+        text = batch["text"]
 
-        for i in range(batch_size):
-            # clone because of
-            # https://github.com/pytorch/pytorch/issues/1995
-            logits = batch["logits"][i].clone()
-            label = batch["labels"][i].clone()
-            pred_label = logits.argmax(dim=-1)
+        argmax_inds = log_probs.cpu().argmax(-1).numpy()
+        argmax_inds = [
+            inds[: int(ind_len)]
+            for inds, ind_len in zip(argmax_inds, log_probs_length.numpy())
+        ]
+        argmax_texts_raw = [self.text_encoder.decode(inds) for inds in argmax_inds]
+        argmax_texts = [self.text_encoder.ctc_decode(inds) for inds in argmax_inds]
 
-            output_id = current_id + i
+        if self.bpe_use:
+            beam_texts = []
 
-            output = {
-                "pred_label": pred_label,
-                "label": label,
-            }
+            predictions = log_probs.detach().cpu().numpy()
+            lengths = log_probs_length.detach().numpy()
+
+            for log_prob_vec, length in zip(predictions, lengths):
+                if self.lm_use:
+                    beams = self.text_encoder.ctc_lm_beam_search(log_prob_vec[:length])
+                else:
+                    beams = self.text_encoder.ctc_beam_search(log_prob_vec[:length])
+                beam_texts.append(beams[0].text)
+
+        for target in text:
+            target = self.text_encoder.normalize_text(target)
+
+        # --- Optional saving logic ---
+        if self.save_path is not None:
+            save_dir = self.save_path / part
+            save_dir.mkdir(exist_ok=True, parents=True)
+
+            batch_size = len(predictions)
+            current_id = batch_idx * batch_size
+            for i in range(batch_size):
+                output_id = current_id + i
+                output = {
+                    "pred_text_argmax": argmax_texts[i],
+                    "pred_text_beam_search": beam_texts[i] if self.bpe_use else None,
+                    "target_text": target[i],
+                }
+
+                # Save predictions as readable text file
+                with open(save_dir / f"pred_{output_id}.txt", "w", encoding="utf-8") as f:
+                    f.write(f"REF: {target[i]}\n")
+                    f.write(f"HYP_argmax: {argmax_texts[i]}\n")
+                    f.write(f"HYP_beam_search: {beam_texts[i]}\n")
+
+        return batch
+
+        # batch_size = batch["logits"].shape[0]
+        # current_id = batch_idx * batch_size
+
+        # for i in range(batch_size):
+        #     # clone because of
+        #     # https://github.com/pytorch/pytorch/issues/1995
+        #     logits = batch["logits"][i].clone()
+        #     label = batch["labels"][i].clone()
+        #     pred_label = logits.argmax(dim=-1)
+
+        #     output_id = current_id + i
+
+        #     output = {
+        #         "pred_label": pred_label,
+        #         "label": label,
+        #     }
 
             if self.save_path is not None:
                 # you can use safetensors or other lib here

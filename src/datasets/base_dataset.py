@@ -30,6 +30,7 @@ class BaseDataset(Dataset):
         max_text_length=None,
         shuffle_index=False,
         instance_transforms=None,
+        eps = None,
     ):
         """
         Args:
@@ -62,6 +63,7 @@ class BaseDataset(Dataset):
         self.text_encoder = text_encoder
         self.target_sr = target_sr
         self.instance_transforms = instance_transforms
+        self.eps = eps if eps is not None else 1e-7
 
     def __getitem__(self, ind):
         """
@@ -84,7 +86,11 @@ class BaseDataset(Dataset):
         text = data_dict["text"]
         text_encoded = self.text_encoder.encode(text)
 
+        if self.instance_transforms is not None and "wav_augs" in self.instance_transforms: # adding wav_augs to audio
+            audio = self.instance_transforms["wav_augs"](audio)
+
         spectrogram = self.get_spectrogram(audio)
+        spectrogram = torch.log(spectrogram + self.eps).squeeze() # log(mel_spec)
 
         instance_data = {
             "audio": audio,
@@ -142,8 +148,9 @@ class BaseDataset(Dataset):
                 instance transform).
         """
         if self.instance_transforms is not None:
+
             for transform_name in self.instance_transforms.keys():
-                if transform_name == "get_spectrogram":
+                if transform_name == "get_spectrogram" or transform_name == "wav_augs": # don't apply wav_augs or get_spectrogram
                     continue  # skip special key
                 instance_data[transform_name] = self.instance_transforms[
                     transform_name

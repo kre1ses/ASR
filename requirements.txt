@@ -11,6 +11,15 @@ wandb
 comet_ml
 hydra-core
 
+editdistance
+
+tokenizers
+speechbrain
+pyctcdecode
+
+gdown
+jsonlines
+
 black
 isort
 pre-commit

@@ -103,21 +103,58 @@ class Trainer(BaseTrainer):
         ]
         argmax_texts_raw = [self.text_encoder.decode(inds) for inds in argmax_inds]
         argmax_texts = [self.text_encoder.ctc_decode(inds) for inds in argmax_inds]
-        tuples = list(zip(argmax_texts, text, argmax_texts_raw, audio_path))
 
-        rows = {}
-        for pred, target, raw_pred, audio_path in tuples[:examples_to_log]:
-            target = self.text_encoder.normalize_text(target)
-            wer = calc_wer(target, pred) * 100
-            cer = calc_cer(target, pred) * 100
+        if self.bpe_use:
+            beam_texts = []
 
-            rows[Path(audio_path).name] = {
-                "target": target,
-                "raw prediction": raw_pred,
-                "predictions": pred,
-                "wer": wer,
-                "cer": cer,
-            }
+            predictions = log_probs.detach().cpu().numpy()
+            lengths = log_probs_length.detach().numpy()
+
+            for log_prob_vec, length in zip(predictions, lengths):
+                if self.lm_use:
+                    beams = self.text_encoder.ctc_lm_beam_search(log_prob_vec[:length])
+                else:
+                    beams = self.text_encoder.ctc_beam_search(log_prob_vec[:length])
+                beam_texts.append(beams[0].text)
+            tuples = list(zip(beam_texts, argmax_texts, text, argmax_texts_raw, audio_path))
+
+            rows = {}
+            for beam_pred, pred, target, raw_pred, audio_path in tuples[:examples_to_log]:
+                target = self.text_encoder.normalize_text(target)
+                wer = calc_wer(target, pred) * 100
+                cer = calc_cer(target, pred) * 100
+
+                beam_wer = calc_wer(target, beam_pred) * 100
+                beam_cer = calc_cer(target, beam_pred) * 100
+
+                rows[Path(audio_path).name] = {
+                    "target": target,
+                    "raw prediction": raw_pred,
+                    "predictions": pred,
+                    "wer": wer,
+                    "cer": cer,
+                    "beam_search_predictions": beam_pred,
+                    "beam_search_wer": beam_wer,
+                    "beam_search_cer": beam_cer,
+                }
+
+        else:
+            tuples = list(zip(argmax_texts, text, argmax_texts_raw, audio_path))
+
+            rows = {}
+            for pred, target, raw_pred, audio_path in tuples[:examples_to_log]:
+                target = self.text_encoder.normalize_text(target)
+                wer = calc_wer(target, pred) * 100
+                cer = calc_cer(target, pred) * 100
+
+                rows[Path(audio_path).name] = {
+                    "target": target,
+                    "raw prediction": raw_pred,
+                    "predictions": pred,
+                    "wer": wer,
+                    "cer": cer,
+                }
+                
         self.writer.add_table(
             "predictions", pd.DataFrame.from_dict(rows, orient="index")
         )

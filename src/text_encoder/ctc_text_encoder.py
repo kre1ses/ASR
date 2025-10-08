@@ -1,5 +1,18 @@
 import re
 from string import ascii_lowercase
+from collections import defaultdict
+from pathlib import Path
+
+from tokenizers import Tokenizer
+from tokenizers.models import BPE
+from tokenizers.pre_tokenizers import Whitespace
+from tokenizers.trainers import BpeTrainer
+
+from pyctcdecode import build_ctcdecoder
+
+import gzip
+import shutil
+from speechbrain.utils.data_utils import download_file # hope ts works
 
 import torch
 
@@ -13,21 +26,95 @@ import torch
 class CTCTextEncoder:
     EMPTY_TOK = ""
 
-    def __init__(self, alphabet=None, **kwargs):
+    def __init__(self, 
+                alphabet=None, 
+                bpe_use=False,
+                lm_use=False,
+                vocab_size=None,
+                beam_size=None,
+                **kwargs):
         """
         Args:
             alphabet (list): alphabet for language. If None, it will be
                 set to ascii
         """
+        self.beam_size = beam_size
 
-        if alphabet is None:
-            alphabet = list(ascii_lowercase + " ")
+        self.path_to_bpe_text = "https://openslr.trmal.net/resources/11/librispeech-lm-norm.txt.gz"
+        self.model_path = "https://openslr.trmal.net/resources/11/4-gram.arpa.gz"
 
-        self.alphabet = alphabet
-        self.vocab = [self.EMPTY_TOK] + list(self.alphabet)
+        if vocab_size is None:
+            self.vocab_size = vocab_size
 
-        self.ind2char = dict(enumerate(self.vocab))
-        self.char2ind = {v: k for k, v in self.ind2char.items()}
+        if bpe_use:
+            self.tokens_path = Path(__file__).absolute().resolve() / 'tokens.json'
+
+            if not self.tokens_path.exists():
+                self.get_tokenizer()
+
+            self.tokenizer = Tokenizer.from_file(str(self.tokens_path))
+
+            self.char2ind = self.tokenizer.get_vocab()
+            self.ind2char = {v: k.lower() for k, v in self.char2ind.items()}
+            self.vocab = [self.ind2char[ind] for ind in range(len(self.ind2char))]
+
+        else:
+            if alphabet is None:
+                alphabet = list(ascii_lowercase + " ")
+
+            self.alphabet = alphabet
+            self.vocab = [self.EMPTY_TOK] + list(self.alphabet)
+
+            self.ind2char = dict(enumerate(self.vocab))
+            self.char2ind = {v: k for k, v in self.ind2char.items()}
+        
+        if lm_use:
+            self.get_lm()
+    
+    def get_lm(self):
+        lm_vocab = self.vocab
+        lm_vocab[0] = ""
+        lm_vocab = [token.upper() for token in lm_vocab]
+
+        path2lm = Path(__file__).absolute().resolve()
+        lm_path = path2lm / '4-gram.arpa'
+        gz_lm_path = path2lm / '4-gram.arpa.gz'
+
+        if not lm_path.exists():
+            if not gz_lm_path.exists():
+                download_file(self.model_path, dest=gz_lm_path)
+
+            with gzip.open(str(gz_lm_path), 'rb') as f_in:
+                with open(str(lm_path), 'wb') as f_out:
+                    shutil.copyfileobj(f_in, f_out)
+        
+        self.lm_decoder = build_ctcdecoder(
+                lm_vocab,
+                kenlm_model_path=str(lm_path)
+            )
+    
+    def get_tokenizer(self):
+        ''' Create a tokenizer with BPE model and save it to the file 'tokens.json' '''
+        path2text = Path(__file__).absolute().resolve()
+
+        text_path = path2text / 'librispeech-lm-norm.txt'
+        gz_text_path = path2text / 'librispeech-lm-norm.txt.gz'
+
+        if not text_path.exists():
+            if not gz_text_path.exists():
+                download_file(self.path_to_bpe_text, dest=gz_text_path)
+
+            with gzip.open(str(gz_text_path), 'rb') as f_in:
+                with open(str(text_path), 'wb') as f_out:
+                    shutil.copyfileobj(f_in, f_out)
+        
+        tokenizer = Tokenizer(BPE(unk_token="[UNK]"))
+        trainer = BpeTrainer(special_tokens=["[UNK]", "'", "^"], vocab_size=self.vocab_size)
+
+        tokenizer.pre_tokenizer = Whitespace()
+        tokenizer.train([str(text_path)], trainer)
+
+        tokenizer.save(str(self.tokens_path))
 
     def __len__(self):
         return len(self.vocab)
@@ -58,11 +145,74 @@ class CTCTextEncoder:
         """
         return "".join([self.ind2char[int(ind)] for ind in inds]).strip()
 
-    def ctc_decode(self, inds) -> str:
-        pass  # TODO
+    def ctc_decode(self, inds) -> str: #self.ind2char
+        # like in seminar but in characters
+        prev_char = self.EMPTY_TOK
+        result = []
+        for ind in inds:
+            if self.ind2char[ind] == prev_char:
+                continue
+            char = self.ind2char[ind]
+            if char != self.EMPTY_TOK:
+                result.append(char)
+            prev_char = char
+        return ("".join(result)).replace("'", "").strip()
 
     @staticmethod
     def normalize_text(text: str):
         text = text.lower()
         text = re.sub(r"[^a-z ]", "", text)
         return text
+    
+    def expand_and_merge_beams(self, 
+                               dp: dict[tuple[str, str], float],
+                               cur_step_prob: torch.Tensor,
+                               ind2char: dict[int, str],
+                               ):
+        # based on seminar
+        
+        new_dp = defaultdict(float)
+        for (pref, prev_char), pref_proba in dp.items():
+            for idx, char in enumerate(self.vocab):
+                cur_proba = pref_proba * cur_step_prob[idx] # log probs
+                cur_char = char
+
+                if char == self.EMPTY_TOK:
+                    cur_pref = pref
+                else:
+                    if prev_char != char:
+                        cur_pref = pref + char
+                    else:
+                        cur_pref = pref
+
+                new_dp[(cur_pref, cur_char)] += cur_proba
+        return new_dp
+    
+    def truncate_beams(self, dp: dict[tuple[str, str], float]):
+        # based on seminar
+        return dict(sorted(list(dp.items()), key=lambda x: -x[1])[:self.beam_size])
+    
+    def ctc_beam_search(self, log_probs):
+        # based on seminar
+        # first arg without empty token
+        probs = log_probs.exp()
+        dp = {
+            ("", self.EMPTY_TOK): 1.0
+        }
+        for cur_step_prob in probs:
+            dp = self.expand_and_merge_beams(dp, cur_step_prob, self.ind2char)
+            dp = self.truncate_beams(dp, self.beam_size)
+        result = [(pref, prob) for (pref, _), prob in dp.items()]
+        return result
+    
+    def ctc_lm_beam_search(self, log_probs, lengths):
+        
+        # log_probs = torch.nn.functional.log_softmax(probs, -1)
+
+        logits_list = [log_probs[i][:lengths[i]].numpy() for i in range(lengths.shape[0])]
+
+        text_list = self.lm_decoder.decode_batch(logits_list=logits_list, beam_width=self.beam_size)
+
+        text_list = [elem.lower().replace("'", "").replace("??", "").strip() for elem in text_list]
+
+        return text_list
