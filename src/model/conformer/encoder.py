@@ -23,7 +23,7 @@ class ConformerEncoder(nn.Module):
             conv_dropout_p: float = 0.1,
             conv_kernel_size: int = 31,
     ):
-        super(ConformerEncoder, self).__init__()
+        super().__init__()
         self.conv_subsample = Conv2dSubampling(
             out_dim = encoder_dim,
             in_dim = input_dim, 

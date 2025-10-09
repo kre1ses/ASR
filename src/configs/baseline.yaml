@@ -1,5 +1,5 @@
 defaults:
-  - model: baseline
+  - model: default_ctc
   - writer: cometml
   - metrics: example
   - datasets: one_batch_test_norm
@@ -22,7 +22,7 @@ text_encoder:
   _target_: src.text_encoder.CTCTextEncoder
   bpe_use: False
   lm_use: False
-  vocab_size: ${model.vocab_size}
+  vocab_size: 128
   beam_size: 5
 trainer:
   log_step: 50
@@ -38,4 +38,5 @@ trainer:
   save_dir: "saved"
   seed: 1
   bpe_use: ${text_encoder.bpe_use}
-  bpe_use: ${text_encoder.lm_use}
+  lm_use: ${text_encoder.lm_use}
+

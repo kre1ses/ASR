@@ -10,8 +10,7 @@ pandas
 wandb
 comet_ml
 hydra-core
-
-math
+wget
 
 editdistance
 

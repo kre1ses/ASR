@@ -3,8 +3,7 @@ import torch.nn as nn
 
 from .ffn import FeedForwardModule
 from .attention import RelativeMultiHeadSelfAttentionModule
-from .convolution import ConformerConvModule
-
+from .convolution import ConvModule
 from .residual import ResidualConnectionModule
 
 
@@ -43,7 +42,7 @@ class ConformerBlock(nn.Module):
             )
 
         self.conv = ResidualConnectionModule(
-                module=ConformerConvModule(
+                module=ConvModule(
                     in_channels=encoder_dim,
                     kernel_size=conv_kernel_size,
                     dropout_p=conv_dropout_p,
