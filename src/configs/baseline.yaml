@@ -1,10 +1,10 @@
 defaults:
   - model: baseline
-  - writer: wandb
+  - writer: cometml
   - metrics: example
-  - datasets: example
+  - datasets: one_batch_test_norm
   - dataloader: example
-  - transforms: example_only_instance
+  - transforms: first_run_only_inst
   - _self_
 optimizer:
   _target_: torch.optim.AdamW
@@ -22,7 +22,7 @@ text_encoder:
   _target_: src.text_encoder.CTCTextEncoder
   bpe_use: False
   lm_use: False
-  vocab_size: 128
+  vocab_size: ${model.vocab_size}
   beam_size: 5
 trainer:
   log_step: 50
@@ -31,7 +31,7 @@ trainer:
   device_tensors: ["spectrogram", "text_encoded"] # which tensors should be on device (ex. GPU)
   resume_from: null # null or path to the checkpoint dir with *.pth and config.yaml
   device: auto # device name or "auto"
-  override: False # if True, will override the previous run with the same name
+  override: True # if True, will override the previous run with the same name
   monitor: "min val_WER_(Argmax)" # "off" or "max/min metric_name", i.e. our goal is to maximize/minimize metric
   save_period: 5 # checkpoint each save_period epochs in addition to the best epoch
   early_stop: ${trainer.n_epochs} # epochs for early stopping

@@ -27,7 +27,7 @@ train:
     - _target_: src.transforms.PeakNormalization
       min_level_db=-30.0
       max_level_db=-20.0
-      p=0.2
+      p=1.0
     - _target_: src.transforms.wav_augs.PitchShift
       min_semitones=-4
       max_semitones=4
