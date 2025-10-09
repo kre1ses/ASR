@@ -167,8 +167,7 @@ class CTCTextEncoder:
     def expand_and_merge_beams(self, 
                                dp: dict[tuple[str, str], float],
                                cur_step_prob: torch.Tensor,
-                               ind2char: dict[int, str],
-                               ):
+                               ) -> dict[tuple[str, str], float]:
         # based on seminar
         
         new_dp = defaultdict(float)

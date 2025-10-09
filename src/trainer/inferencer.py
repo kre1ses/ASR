@@ -145,8 +145,7 @@ class Inferencer(BaseTrainer):
         argmax_inds = [
             inds[: int(ind_len)]
             for inds, ind_len in zip(argmax_inds, log_probs_length.numpy())
-        ]
-        argmax_texts_raw = [self.text_encoder.decode(inds) for inds in argmax_inds]
+            ]
         argmax_texts = [self.text_encoder.ctc_decode(inds) for inds in argmax_inds]
 
         if self.bpe_use:
@@ -205,11 +204,11 @@ class Inferencer(BaseTrainer):
         #         "label": label,
         #     }
 
-            if self.save_path is not None:
-                # you can use safetensors or other lib here
-                torch.save(output, self.save_path / part / f"output_{output_id}.pth")
+        #     if self.save_path is not None:
+        #         # you can use safetensors or other lib here
+        #         torch.save(output, self.save_path / part / f"output_{output_id}.pth")
 
-        return batch
+        # return batch
 
     def _inference_part(self, part, dataloader):
         """
