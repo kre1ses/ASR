@@ -31,7 +31,7 @@ class BaseTrainer:
         epoch_len=None,
         skip_oom=True,
         batch_transforms=None,
-        bpe_use=False,
+        beam_use=False,
         lm_use=False,
     ):
         """
@@ -147,7 +147,7 @@ class BaseTrainer:
         if config.trainer.get("from_pretrained") is not None:
             self._from_pretrained(config.trainer.get("from_pretrained"))
         
-        self.bpe_use = bpe_use
+        self.beam_use = beam_use
         self.lm_use = lm_use
 
     def train(self):

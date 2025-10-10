@@ -86,7 +86,7 @@ class Trainer(BaseTrainer):
 
     def log_spectrogram(self, spectrogram, **batch):
         spectrogram_for_plot = spectrogram[0].detach().cpu()
-        image = plot_spectrogram(spectrogram_for_plot)
+        image = plot_spectrogram(spectrogram_for_plot.transpose(-2,-1))
         self.writer.add_image("spectrogram", image)
 
     def log_predictions(
@@ -104,7 +104,7 @@ class Trainer(BaseTrainer):
         argmax_texts_raw = [self.text_encoder.decode(inds) for inds in argmax_inds]
         argmax_texts = [self.text_encoder.ctc_decode(inds) for inds in argmax_inds]
 
-        if self.bpe_use:
+        if self.beam_use:
             beam_texts = []
 
             predictions = log_probs.detach().cpu().numpy()

@@ -32,13 +32,10 @@ class ConformerBlock(nn.Module):
                 module_factor = 0.5,
             )
         
-        self.mhsa = ResidualConnectionModule(
-                module=RelativeMultiHeadSelfAttentionModule(
-                    d_model=encoder_dim,
-                    num_heads=num_heads,
-                    attn_dropout_p=attn_dropout_p,
-                ),
-                module_factor = 1.0
+        self.mhsa = RelativeMultiHeadSelfAttentionModule(
+            d_model=encoder_dim,
+            num_heads=num_heads,
+            p_dropout=attn_dropout_p
             )
 
         self.conv = ResidualConnectionModule(
@@ -61,9 +58,9 @@ class ConformerBlock(nn.Module):
         
         self.layer_norm = nn.LayerNorm(encoder_dim)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, output_lengths) -> torch.Tensor:
         x = self.ffn_1(x)
-        x = self.mhsa(x)
+        x = self.mhsa(x, output_lengths) + x
         x = self.conv(x)
         x = self.ffn_2(x)
         x = self.layer_norm(x)

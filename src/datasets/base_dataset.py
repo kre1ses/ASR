@@ -86,8 +86,8 @@ class BaseDataset(Dataset):
         text = data_dict["text"]
         text_encoded = self.text_encoder.encode(text)
 
-        if self.instance_transforms is not None and "wav_augs" in self.instance_transforms: # adding wav_augs to audio
-            audio = self.instance_transforms["wav_augs"](audio)
+        if self.instance_transforms is not None and "audio" in self.instance_transforms: # adding wav_augs to audio
+            audio = self.instance_transforms["audio"](audio)
 
         spectrogram = self.get_spectrogram(audio)
         spectrogram = torch.log(spectrogram + self.eps).squeeze() # log(mel_spec)

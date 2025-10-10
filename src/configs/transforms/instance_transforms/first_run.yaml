@@ -2,7 +2,8 @@ train:
   get_spectrogram: # special key for getting spectrogram
     _target_: torchaudio.transforms.MelSpectrogram
     sample_rate: 16000
-  spec_augs: # name of the tensor on which we apply transform
+    n_mels: 80
+  spectrogram: # name of the tensor on which we apply transform
     _target_: torch.nn.Sequential # to apply several transforms sequentially
     _args_:
       - _target_: src.transforms.spec_augs.FrequencyMasking
@@ -11,7 +12,7 @@ train:
       - _target_: src.transforms.spec_augs.TimeMasking
         time_mask_param: 35
         p: 0.2
-  wav_augs: # name of the tensor on which we apply transform
+  audio: # name of the tensor on which we apply transform
     _target_: torch.nn.Sequential # to apply several transforms sequentially
     _args_:
       - _target_: src.transforms.wav_augs.Gain
@@ -31,3 +32,4 @@ inference:
   get_spectrogram:
     _target_: torchaudio.transforms.MelSpectrogram
     sample_rate: 16000
+    n_mels: 80

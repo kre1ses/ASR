@@ -148,7 +148,7 @@ class Inferencer(BaseTrainer):
             ]
         argmax_texts = [self.text_encoder.ctc_decode(inds) for inds in argmax_inds]
 
-        if self.bpe_use:
+        if self.beam_use:
             beam_texts = []
 
             predictions = log_probs.detach().cpu().numpy()

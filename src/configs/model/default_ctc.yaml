@@ -1,16 +1,15 @@
-model:
-  _target_: src.model.conformer.model.Conformer
-  vocab_size: 128
-  input_dim: 80
-  encoder_dim: 512
-  input_dropout_p: 0.1
+_target_: src.model.conformer.model.Conformer
+n_tokens: 128
+input_dim: 80
+encoder_dim: 512
+input_dropout_p: 0.1
 
-  num_layers: 17
-  num_attn_heads: 8
-  attn_dropout_p: 0.1
+num_layers: 17
+num_attn_heads: 8
+attn_dropout_p: 0.1
 
-  feed_forward_expansion_factor: 4
-  feed_forward_dropout_p: 0.1
+ffn_expansion_factor: 4
+ffn_dropout_p: 0.1
 
-  conv_dropout_p: 0.1
-  conv_kernel_size: 10
+conv_dropout_p: 0.1
+conv_kernel_size: 31

@@ -36,7 +36,7 @@ def collate_fn(dataset_items: list[dict]):
         "text_encoded": text_encoded_padded,
         "audio_path": audio_paths,
         "spectrogram_lengths": spec_lengths,
-        "text_encoded_lengths": text_lengths,
+        "text_encoded_length": text_lengths,
     }
 
     return result_batch

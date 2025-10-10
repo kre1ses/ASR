@@ -30,8 +30,8 @@ class RelativeMultiHeadSelfAttentionBlock(nn.Module):
         self.rpe = RelativeSinusoidalPositionEmbedding(d_model)
         self.rpe_proj = nn.Linear(d_model, d_model, bias=False)
 
-        self.u_bias = nn.Parameter(torch.Tensor(self.num_heads, self.d_head))
-        self.v_bias = nn.Parameter(torch.Tensor(self.num_heads, self.d_head))
+        self.u_bias = nn.Parameter(torch.Tensor(self.num_heads, self.d_k))
+        self.v_bias = nn.Parameter(torch.Tensor(self.num_heads, self.d_k))
         torch.nn.init.xavier_uniform_(self.u_bias)
         torch.nn.init.xavier_uniform_(self.v_bias)
 
@@ -53,7 +53,7 @@ class RelativeMultiHeadSelfAttentionBlock(nn.Module):
         Q = self.Q(query).view(batch_size, -1, self.num_heads, self.d_k)
         K = self.K(key).view(batch_size, -1, self.num_heads, self.d_k).transpose(1, 2)
         V = self.V(value).view(batch_size, -1, self.num_heads, self.d_k).transpose(1, 2)
-        R = self.rpe_proj(self.rpe(pos_embedding)).view(batch_size, -1, self.num_heads, self.d_k)
+        R = self.rpe_proj(pos_embedding).view(batch_size, -1, self.num_heads, self.d_k)
 
         main_score = torch.matmul((Q + self.u_bias).transpose(1, 2), K.transpose(2, 3))
         rpe_score = torch.matmul((Q + self.v_bias).transpose(1, 2), R.transpose(2, 3).transpose(1, 3)) # 0 1 2 3 -> 0 1 3 2 -> 0 2 3 1
@@ -69,7 +69,7 @@ class RelativeMultiHeadSelfAttentionBlock(nn.Module):
         scores = (main_score + rpe_score) / math.sqrt(self.d_k)
 
         if mask is not None:
-            mask = mask.unsqueeze(1)
+            mask = mask.unsqueeze(1).unsqueeze(2)
             scores.masked_fill_(mask, -1e10)
 
         scores = F.softmax(scores, dim=-1)
@@ -89,9 +89,14 @@ class RelativeMultiHeadSelfAttentionModule(nn.Module):
         self.dropout = nn.Dropout(p = p_dropout)
         self.layer_norm = nn.LayerNorm(d_model)
     
-    def forward(self, x: torch.Tensor, mask: torch.Tensor = None) -> torch.Tensor:
-        B = x.size(0)
-        pos_embedding = self.positional_encoding(x)
+    def forward(self, x: torch.Tensor, output_lenght: torch.Tensor = None) -> torch.Tensor:
+        B, T, D = x.size()
+
+        device = x.device
+        seq_range = torch.arange(T, device=device)[None, :]  # (1, T)
+        mask = seq_range < output_lenght[:, None] 
+
+        pos_embedding = self.rpe(x)
         pos_embedding = pos_embedding.repeat(B, 1, 1)
 
         x = self.layer_norm(x)
