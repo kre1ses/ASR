@@ -54,6 +54,33 @@ class ConvModule(nn.Module):
         x = self.conv_module(x)
         # print(x.shape)
         return x.transpose(1, 2)
+
+class Conv2dSubsampling(nn.Module):
+    def __init__(self, out_dim: int, in_dim: int, p_dropout: float = 0.1):
+        super().__init__()
+
+        self.conv = nn.Sequential(
+            nn.Conv2d(
+                in_channels = 1,
+                out_channels = out_dim,
+                kernel_size = 3,
+                stride = 2,
+            ),
+            nn.ReLU(),
+            nn.Conv2d(
+                in_channels = out_dim,
+                out_channels = out_dim,
+                kernel_size = 3,
+                stride = 2,
+            ),
+            nn.ReLU(),
+        )
+
+        self.linear = nn.Linear(out_dim * (in_dim - 1) // 4, out_dim, bias=True)
+        init.xavier_uniform_(self.linear.weight)
+        init.zeros_(self.linear.bias)
+
+        self.dropout = nn.Dropout(p = p_dropout)
     
     def forward(self, x: torch.Tensor, input_lengths: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         x = x.unsqueeze(1)  # (batch_size, 1, seq_len, freq)
