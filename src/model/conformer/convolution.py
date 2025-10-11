@@ -76,7 +76,7 @@ class Conv2dSubsampling(nn.Module):
             nn.ReLU(),
         )
 
-        self.linear = nn.Linear(out_dim * (in_dim - 1) // 4, out_dim, bias=True)
+        self.linear = nn.Linear(out_dim * ((in_dim - 1) // 2 - 1) // 2, out_dim, bias=True)
         init.xavier_uniform_(self.linear.weight)
         init.zeros_(self.linear.bias)
 

@@ -47,7 +47,8 @@ class Conformer(nn.Module):
     def forward(
             self, 
             spectrogram: torch.Tensor, 
-            spectrogram_lengths: torch.Tensor
+            spectrogram_lengths: torch.Tensor,
+            **batch
             ) -> tuple[torch.Tensor, torch.Tensor]:
 
         encoder_outputs, log_probs_length = self.encoder(spectrogram, spectrogram_lengths)

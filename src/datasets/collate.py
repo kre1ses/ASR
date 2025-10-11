@@ -20,6 +20,10 @@ def collate_fn(dataset_items: list[dict]):
     text_encoded = [torch.tensor(item["text_encoded"], dtype=torch.long) for item in dataset_items]
     audio_paths = [item["audio_path"] for item in dataset_items]
 
+    audios = [t.squeeze() for t in audios]
+    specs = [t.squeeze() for t in specs]
+    text_encoded = [t.squeeze() for t in text_encoded]
+
     # Padding
     audio_padded = torch.nn.utils.rnn.pad_sequence(audios, batch_first=True)
     spec_padded = torch.nn.utils.rnn.pad_sequence(specs, batch_first=True)

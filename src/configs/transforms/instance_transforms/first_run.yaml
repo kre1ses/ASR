@@ -20,6 +20,7 @@ train:
         max_gain_in_db: 10.0
         p: 0.2
       - _target_: src.transforms.wav_augs.AddColoredNoise
+        sample_rate: 15000
         p: 0.2
       - _target_: src.transforms.wav_augs.PolarityInversion
         p: 0.2
