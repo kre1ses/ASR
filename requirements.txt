@@ -24,3 +24,4 @@ jsonlines
 black
 isort
 pre-commit
+kenlm

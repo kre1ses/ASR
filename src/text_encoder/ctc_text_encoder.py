@@ -15,6 +15,10 @@ import shutil
 from speechbrain.utils.data_utils import download_file # hope ts works
 
 import torch
+import numpy as np
+import os
+import kenlm
+from multiprocessing import Pool, set_start_method
 
 # TODO add CTC decode
 # TODO add BPE, LM, Beam Search support
@@ -43,11 +47,11 @@ class CTCTextEncoder:
         self.path_to_bpe_text = "https://openslr.trmal.net/resources/11/librispeech-lm-norm.txt.gz"
         self.model_path = "https://openslr.trmal.net/resources/11/4-gram.arpa.gz"
 
-        if vocab_size is None:
+        if vocab_size is not None:
             self.vocab_size = vocab_size
 
         if bpe_use:
-            self.tokens_path = Path(__file__).absolute().resolve() / 'tokens.json'
+            self.tokens_path = Path(os.getcwd()).absolute().resolve() / 'bpe_data/tokens.json'
 
             if not self.tokens_path.exists():
                 self.get_tokenizer()
@@ -76,7 +80,7 @@ class CTCTextEncoder:
         lm_vocab[0] = ""
         lm_vocab = [token.upper() for token in lm_vocab]
 
-        path2lm = Path(__file__).absolute().resolve()
+        path2lm = Path(os.getcwd()).absolute().resolve() / 'lm_model'
         lm_path = path2lm / '4-gram.arpa'
         gz_lm_path = path2lm / '4-gram.arpa.gz'
 
@@ -95,7 +99,7 @@ class CTCTextEncoder:
     
     def get_tokenizer(self):
         ''' Create a tokenizer with BPE model and save it to the file 'tokens.json' '''
-        path2text = Path(__file__).absolute().resolve()
+        path2text = Path(os.getcwd()).absolute().resolve()  / 'bpe_data'
 
         text_path = path2text / 'librispeech-lm-norm.txt'
         gz_text_path = path2text / 'librispeech-lm-norm.txt.gz'
@@ -194,13 +198,13 @@ class CTCTextEncoder:
     def ctc_beam_search(self, log_probs):
         # based on seminar
         # first arg without empty token
-        probs = log_probs.exp()
+        probs = np.exp(log_probs)
         dp = {
             ("", self.EMPTY_TOK): 1.0
         }
         for cur_step_prob in probs:
-            dp = self.expand_and_merge_beams(dp, cur_step_prob, self.ind2char)
-            dp = self.truncate_beams(dp, self.beam_size)
+            dp = self.expand_and_merge_beams(dp, cur_step_prob)
+            dp = self.truncate_beams(dp)
         result = [(pref, prob) for (pref, _), prob in dp.items()]
         return result
     
@@ -210,7 +214,9 @@ class CTCTextEncoder:
 
         logits_list = [log_probs[i][:lengths[i]].numpy() for i in range(lengths.shape[0])]
 
-        text_list = self.lm_decoder.decode_batch(logits_list=logits_list, beam_width=self.beam_size)
+        set_start_method("fork", force=True)
+        with Pool(processes=4) as pool:
+            text_list = self.lm_decoder.decode_batch(logits_list=logits_list, beam_width=self.beam_size, pool = pool)
 
         text_list = [elem.lower().replace("'", "").replace("??", "").strip() for elem in text_list]
 

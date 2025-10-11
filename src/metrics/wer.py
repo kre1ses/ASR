@@ -29,10 +29,9 @@ class ArgmaxWERMetric(BaseMetric):
         return sum(wers) / len(wers)
 
 class BeamSearchWERMetric(BaseMetric):
-    def __init__(self, text_encoder, beam_size=5, lm_use=False, *args, **kwargs):
+    def __init__(self, text_encoder, lm_use=False, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.text_encoder = text_encoder
-        self.beam_size = beam_size
         self.lm_use = lm_use
 
     def __call__(
@@ -44,21 +43,21 @@ class BeamSearchWERMetric(BaseMetric):
             log_probs = log_probs.detach().cpu()
             log_probs_length = log_probs_length.detach().cpu()
 
-            beams = self.text_encoder.ctc_lm_beam_search(log_probs, log_probs_length,self.beam_size)
+            beams = self.text_encoder.ctc_lm_beam_search(log_probs, log_probs_length)
 
             for pred_text, target_text in zip(beams, text):
                 cers.append(calc_wer(target_text, pred_text))
                 
             return sum(cers) / len(cers)
 
-        predictions = log_probs.cpu().numpy()
+        predictions = log_probs.cpu().detach().numpy()
         lengths = log_probs_length.detach().numpy()
 
         for log_prob_vec, length, target_text in zip(predictions, lengths, text):
 
             target_text = self.text_encoder.normalize_text(target_text)
             beams = self.text_encoder.ctc_beam_search(
-                log_prob_vec[:length], beam_size=self.beam_size
+                log_prob_vec[:length]
             )
             pred_text = beams[0][0]  # best beam
 

@@ -20,14 +20,14 @@ loss_function:
   _target_: src.loss.CTCLossWrapper
 text_encoder:
   _target_: src.text_encoder.CTCTextEncoder
-  bpe_use: False
+  beam_use: True
   lm_use: False
   vocab_size: 128
   beam_size: 5
 trainer:
   log_step: 50
-  n_epochs: 50
-  epoch_len: 200
+  n_epochs: 10
+  epoch_len: 2
   device_tensors: ["spectrogram", "text_encoded"] # which tensors should be on device (ex. GPU)
   resume_from: null # null or path to the checkpoint dir with *.pth and config.yaml
   device: auto # device name or "auto"
