@@ -1,11 +1,11 @@
 _target_: src.model.conformer.model.Conformer
 n_tokens: 128
 input_dim: 80
-encoder_dim: 512
+encoder_dim: 176
 input_dropout_p: 0.1
 
-num_layers: 17
-num_attn_heads: 8
+num_layers: 16
+num_attn_heads: 4
 attn_dropout_p: 0.1
 
 ffn_expansion_factor: 4

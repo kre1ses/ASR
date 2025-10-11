@@ -26,7 +26,7 @@ train:
       - _target_: src.transforms.wav_augs.PeakNormalization
         p: 1.0
       - _target_: src.transforms.wav_augs.PitchShift
-        sample_rate: 15000
+        sample_rate: 20000
         p: 0.2
 inference:
   get_spectrogram:
