@@ -38,6 +38,7 @@ class CTCTextEncoder:
                 lm_use=False,
                 vocab_size=None,
                 beam_size=None,
+                beam_use=False,
                 **kwargs):
         """
         Args:
@@ -45,6 +46,9 @@ class CTCTextEncoder:
                 set to ascii
         """
         self.beam_size = beam_size
+        self.beam_use = beam_use
+        self.lm_use = lm_use
+        self.bpe_use = bpe_use
 
         self.path_to_bpe_text = "https://openslr.trmal.net/resources/11/librispeech-lm-norm.txt.gz"
         self.model_path = "https://openslr.trmal.net/resources/11/4-gram.arpa.gz"

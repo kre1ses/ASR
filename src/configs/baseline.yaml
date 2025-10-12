@@ -38,5 +38,3 @@ trainer:
   early_stop: ${trainer.n_epochs} # epochs for early stopping
   save_dir: "saved"
   seed: 1
-  lm_use: ${text_encoder.lm_use}
-  beam_use: ${text_encoder.beam_use}

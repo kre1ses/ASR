@@ -13,7 +13,7 @@ class Trainer(BaseTrainer):
     Trainer class. Defines the logic of batch logging and processing.
     """
 
-    def process_batch(self, batch, metrics: MetricTracker):
+    def process_batch(self, batch_idx, batch, metrics: MetricTracker):
         """
         Run batch through the model, compute metrics, compute loss,
         and do training step (during training stage).
@@ -38,8 +38,8 @@ class Trainer(BaseTrainer):
         metric_funcs = self.metrics["inference"]
         if self.is_train:
             metric_funcs = self.metrics["train"]
-            self.optimizer.zero_grad()
-
+            if (batch_idx + 1) % 4 == 0:
+                self.optimizer.zero_grad()
         outputs = self.model(**batch)
         batch.update(outputs)
 
@@ -49,7 +49,8 @@ class Trainer(BaseTrainer):
         if self.is_train:
             batch["loss"].backward()  # sum of all losses is always called loss
             self._clip_grad_norm()
-            self.optimizer.step()
+            if (batch_idx + 1) % 4 == 0:
+                self.optimizer.step()
             if self.lr_scheduler is not None:
                 self.lr_scheduler.step()
 
@@ -104,18 +105,19 @@ class Trainer(BaseTrainer):
         argmax_texts_raw = [self.text_encoder.decode(inds) for inds in argmax_inds]
         argmax_texts = [self.text_encoder.ctc_decode(inds) for inds in argmax_inds]
 
-        if self.beam_use:
+        if self.text_encoder.beam_use:
             beam_texts = []
 
-            predictions = log_probs.detach().cpu().numpy()
-            lengths = log_probs_length.detach().numpy()
-
-            for log_prob_vec, length in zip(predictions, lengths):
-                if self.lm_use:
-                    beams = self.text_encoder.ctc_lm_beam_search(log_prob_vec[:length])
-                else:
+            if self.text_encoder.lm_use:
+                predictions = log_probs.detach().cpu()
+                lengths = log_probs_length.detach()
+                beam_texts = self.text_encoder.ctc_lm_beam_search(predictions, lengths) ############
+            else:
+                predictions = log_probs.detach().cpu().numpy()
+                lengths = log_probs_length.detach().numpy()
+                for log_prob_vec, length in zip(predictions, lengths):
                     beams = self.text_encoder.ctc_beam_search(log_prob_vec[:length])
-                beam_texts.append(beams[0].text)
+                beam_texts.append(beams[0][0])
             tuples = list(zip(beam_texts, argmax_texts, text, argmax_texts_raw, audio_path))
 
             rows = {}

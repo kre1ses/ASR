@@ -26,8 +26,6 @@ class Inferencer(BaseTrainer):
         metrics=None,
         batch_transforms=None,
         skip_model_load=False,
-        beam_use = True,
-        lm_use = False,
     ):
         """
         Initialize the Inferencer.
@@ -86,9 +84,6 @@ class Inferencer(BaseTrainer):
         if not skip_model_load:
             # init model
             self._from_pretrained(config.inferencer.get("from_pretrained"))
-        
-        self.beam_use = beam_use
-        self.lm_use = lm_use
 
     def run_inference(self):
         """
@@ -153,21 +148,23 @@ class Inferencer(BaseTrainer):
             ]
         argmax_texts = [self.text_encoder.ctc_decode(inds) for inds in argmax_inds]
 
-        if self.beam_use:
+        if self.text_encoder.beam_use:
             beam_texts = []
-
-            predictions = log_probs.detach().cpu().numpy()
-            lengths = log_probs_length.detach().numpy()
-
-            for log_prob_vec, length in zip(predictions, lengths):
-                if self.lm_use:
-                    beams = self.text_encoder.ctc_lm_beam_search(log_prob_vec[:length])
-                else:
+            
+            if self.text_encoder.lm_use:
+                predictions = log_probs.detach().cpu()
+                lengths = log_probs_length.detach()
+                beams = self.text_encoder.ctc_lm_beam_search(log_prob_vec[:length], length)
+            else:
+                predictions = log_probs.detach().cpu().numpy()
+                lengths = log_probs_length.detach().numpy()
+                for log_prob_vec, length in zip(predictions, lengths):
                     beams = self.text_encoder.ctc_beam_search(log_prob_vec[:length])
-                beam_texts.append(beams[0].text)
+                beam_texts.append(beams[0][0])
 
-        for target in text:
-            target = self.text_encoder.normalize_text(target)
+        target = []
+        for txt in text:
+            target.append(self.text_encoder.normalize_text(txt))
 
         # --- Optional saving logic ---
         if self.save_path is not None:

@@ -31,8 +31,6 @@ class BaseTrainer:
         epoch_len=None,
         skip_oom=True,
         batch_transforms=None,
-        beam_use=False,
-        lm_use=False,
     ):
         """
         Args:
@@ -146,9 +144,6 @@ class BaseTrainer:
 
         if config.trainer.get("from_pretrained") is not None:
             self._from_pretrained(config.trainer.get("from_pretrained"))
-        
-        self.beam_use = beam_use
-        self.lm_use = lm_use
 
     def train(self):
         """
@@ -215,6 +210,7 @@ class BaseTrainer:
         ):
             try:
                 batch = self.process_batch(
+                    batch_idx,
                     batch,
                     metrics=self.train_metrics,
                 )

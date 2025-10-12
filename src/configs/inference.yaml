@@ -18,5 +18,3 @@ inferencer:
   save_path: "first_inf" # any name here, can be a dataset name
   seed: 1
   from_pretrained: "saved/testing/model_best.pth" # path to the pretrained model
-  lm_use: ${text_encoder.lm_use}
-  beam_use: ${text_encoder.beam_use}
