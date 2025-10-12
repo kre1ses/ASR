@@ -60,6 +60,7 @@ class CTCTextEncoder:
 
             self.char2ind = self.tokenizer.get_vocab()
             self.ind2char = {v: k.lower() for k, v in self.char2ind.items()}
+            self.char2ind = {v: k for k, v in self.ind2char.items()}
             self.vocab = [self.ind2char[ind] for ind in range(len(self.ind2char))]
 
         else:
@@ -113,7 +114,7 @@ class CTCTextEncoder:
                     shutil.copyfileobj(f_in, f_out)
         
         tokenizer = Tokenizer(BPE(unk_token="[UNK]"))
-        trainer = BpeTrainer(special_tokens=["[UNK]", "'", "^"], vocab_size=self.vocab_size)
+        trainer = BpeTrainer(special_tokens=["[UNK]", "'", "^", " "], vocab_size=self.vocab_size)
 
         tokenizer.pre_tokenizer = Whitespace()
         tokenizer.train([str(text_path)], trainer)

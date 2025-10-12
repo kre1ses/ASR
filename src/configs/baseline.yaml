@@ -22,12 +22,13 @@ text_encoder:
   _target_: src.text_encoder.CTCTextEncoder
   beam_use: True
   lm_use: False
+  bpe_use: True
   vocab_size: 128
   beam_size: 5
 trainer:
-  log_step: 50
+  log_step: 10
   n_epochs: 10
-  epoch_len: 2
+  epoch_len: 100
   device_tensors: ["spectrogram", "text_encoded"] # which tensors should be on device (ex. GPU)
   resume_from: null # null or path to the checkpoint dir with *.pth and config.yaml
   device: auto # device name or "auto"
@@ -39,4 +40,3 @@ trainer:
   seed: 1
   bpe_use: ${text_encoder.bpe_use}
   lm_use: ${text_encoder.lm_use}
-

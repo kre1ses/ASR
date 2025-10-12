@@ -24,4 +24,6 @@ jsonlines
 black
 isort
 pre-commit
+
+multiprocessing
 kenlm
