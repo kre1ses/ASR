@@ -1,18 +1,15 @@
-import random
-
 from torch import Tensor, nn
 from torchaudio import transforms as T
 
 
 class FrequencyMasking(nn.Module):
-    def __init__(self, p, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__()
-        self.p = p
         self._aug = T.FrequencyMasking(*args, **kwargs)
 
     def __call__(self, data: Tensor):
-        if random.random() < self.p:
-            x = data.unsqueeze(1)
-            return self._aug(x).squeeze(1)
-        else:
-            return data
+        x = data.unsqueeze(1)
+        x = x.transpose(0,1)
+        for i in range(4):
+            x = self._aug(x)
+        return x.squeeze(1)

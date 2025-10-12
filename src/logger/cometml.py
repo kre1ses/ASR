@@ -177,7 +177,7 @@ class CometMLWriter:
                 in the CometML-friendly format.
         """
         self.exp.log_image(
-            image_data=image, name=self._object_name(image_name), step=self.step, image_channels="first"
+            image_data=image.permute(1,2,0), name=self._object_name(image_name), step=self.step, image_channels="last"
         )
 
     def add_audio(self, audio_name, audio, sample_rate=None):
