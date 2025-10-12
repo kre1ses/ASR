@@ -147,6 +147,7 @@ class Inferencer(BaseTrainer):
             for inds, ind_len in zip(argmax_inds, log_probs_length.numpy())
             ]
         argmax_texts = [self.text_encoder.ctc_decode(inds) for inds in argmax_inds]
+        argmax_texts = [elem.lower().replace("'", "").replace("[unk]", "").strip() for elem in argmax_texts]
 
         if self.text_encoder.beam_use:
             beam_texts = []
@@ -160,7 +161,8 @@ class Inferencer(BaseTrainer):
                 lengths = log_probs_length.detach().numpy()
                 for log_prob_vec, length in zip(predictions, lengths):
                     beams = self.text_encoder.ctc_beam_search(log_prob_vec[:length])
-                beam_texts.append(beams[0][0])
+                    beams = [elem.lower().replace("'", "").replace("[unk]", "").strip() for elem in beams]
+                    beam_texts.append(beams[0][0])
 
         target = []
         for txt in text:
