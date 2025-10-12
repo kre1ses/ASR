@@ -1,13 +1,22 @@
 defaults:
-  - model: baseline
+  - model: default_ctc
   - metrics: example
-  - datasets: example_eval # we do not want to run inference on training data
+  - datasets: one_batch_test_norm
   - dataloader: example
-  - transforms: example
+  - transforms: first_run_only_inst
   - _self_
+text_encoder:
+  _target_: src.text_encoder.CTCTextEncoder
+  beam_use: True
+  lm_use: True
+  bpe_use: True
+  vocab_size: 128
+  beam_size: 5
 inferencer:
-  device_tensors: ["data_object", "labels"] # which tensors should be on device (ex. GPU)
+  device_tensors: ["spectrogram", "text_encoded"] # which tensors should be on device (ex. GPU)
   device: auto # device name or "auto"
-  save_path: "example" # any name here, can be a dataset name
+  save_path: "first_inf" # any name here, can be a dataset name
   seed: 1
-  from_pretrained: "saved/model_best.pth" # path to the pretrained model
+  from_pretrained: "saved/testing/model_best.pth" # path to the pretrained model
+  lm_use: ${text_encoder.lm_use}
+  beam_use: ${text_encoder.beam_use}

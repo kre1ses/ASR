@@ -20,6 +20,8 @@ import os
 import kenlm
 from multiprocessing import Pool, set_start_method
 
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 # TODO add CTC decode
 # TODO add BPE, LM, Beam Search support
 # Note: think about metrics and encoder

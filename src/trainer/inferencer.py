@@ -26,6 +26,8 @@ class Inferencer(BaseTrainer):
         metrics=None,
         batch_transforms=None,
         skip_model_load=False,
+        beam_use = True,
+        lm_use = False,
     ):
         """
         Initialize the Inferencer.
@@ -84,6 +86,9 @@ class Inferencer(BaseTrainer):
         if not skip_model_load:
             # init model
             self._from_pretrained(config.inferencer.get("from_pretrained"))
+        
+        self.beam_use = beam_use
+        self.lm_use = lm_use
 
     def run_inference(self):
         """
@@ -175,7 +180,7 @@ class Inferencer(BaseTrainer):
                 output_id = current_id + i
                 output = {
                     "pred_text_argmax": argmax_texts[i],
-                    "pred_text_beam_search": beam_texts[i] if self.bpe_use else None,
+                    "pred_text_beam_search": beam_texts[i] if self.beam_use else None,
                     "target_text": target[i],
                 }
 
