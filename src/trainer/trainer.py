@@ -117,9 +117,9 @@ class Trainer(BaseTrainer):
                 predictions = log_probs.detach().cpu().numpy()
                 lengths = log_probs_length.detach().numpy()
                 for log_prob_vec, length in zip(predictions, lengths):
-                    beams = self.text_encoder.ctc_beam_search(log_prob_vec[:length])
-                    beams = [elem.lower().replace("'", "").replace("[unk]", "").strip() for elem in beams]
-                    beam_texts.append(beams[0][0])
+                    beams = self.text_encoder.ctc_beam_search(log_prob_vec[:length])[0][0]
+                    beams = beams.lower().replace("'", "").replace("[unk]", "").strip()
+                    beam_texts.append(beams)
             tuples = list(zip(beam_texts, argmax_texts, text, argmax_texts_raw, audio_path))
 
             rows = {}
