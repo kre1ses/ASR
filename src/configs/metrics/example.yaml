@@ -5,10 +5,10 @@ train: # metrics that are calculated during training
     name: "WER_(Argmax)"
   - _target_: src.metrics.BeamSearchCERMetric
     name: "CER_(BeamSearch)" # it is better to avoid spaces in names
-    lm_use: False
+    lm_use: ${text_encoder.lm_use}
   - _target_: src.metrics.BeamSearchWERMetric
     name: "WER_(BeamSearch)"
-    lm_use: False
+    lm_use: ${text_encoder.lm_use}
 inference: # metrics that are calculated during inference (eval)
   - _target_: src.metrics.ArgmaxCERMetric
     name: "CER_(Argmax)" # it is better to avoid spaces in names
@@ -16,7 +16,7 @@ inference: # metrics that are calculated during inference (eval)
     name: "WER_(Argmax)"
   - _target_: src.metrics.BeamSearchCERMetric
     name: "CER_(BeamSearch)" # it is better to avoid spaces in names
-    lm_use: False
+    lm_use: ${text_encoder.lm_use}
   - _target_: src.metrics.BeamSearchWERMetric
     name: "WER_(BeamSearch)"
-    lm_use: False
+    lm_use: ${text_encoder.lm_use}
