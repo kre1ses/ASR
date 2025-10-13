@@ -7,6 +7,8 @@ from src.metrics.tracker import MetricTracker
 from src.metrics.utils import calc_cer, calc_wer
 from src.trainer.base_trainer import BaseTrainer
 
+from torch.cuda.amp import GradScaler, autocast
+
 
 class Trainer(BaseTrainer):
     """
@@ -40,19 +42,23 @@ class Trainer(BaseTrainer):
             metric_funcs = self.metrics["train"]
             if (batch_idx + 1) % 4 == 0:
                 self.optimizer.zero_grad()
-        outputs = self.model(**batch)
+        with autocast():
+            outputs = self.model(**batch)
         batch.update(outputs)
 
-        all_losses = self.criterion(**batch)
+        with autocast():
+            all_losses = self.criterion(**batch)
         batch.update(all_losses)
 
         if self.is_train:
-            batch["loss"].backward()  # sum of all losses is always called loss
+            self.scaler.scale(batch["loss"]).backward()  # sum of all losses is always called loss
             self._clip_grad_norm()
             if (batch_idx + 1) % 4 == 0:
-                self.optimizer.step()
+                self.scaler.step(self.optimizer)
+                # self.optimizer.step()
             if self.lr_scheduler is not None:
                 self.lr_scheduler.step()
+            self.scaler.update()
 
         # update metrics for each loss (in case of multiple losses)
         for loss_name in self.config.writer.loss_names:
@@ -125,11 +131,11 @@ class Trainer(BaseTrainer):
             rows = {}
             for beam_pred, pred, target, raw_pred, audio_path in tuples[:examples_to_log]:
                 target = self.text_encoder.normalize_text(target)
-                wer = calc_wer(target, pred) * 100
-                cer = calc_cer(target, pred) * 100
+                wer = calc_wer(target, pred)
+                cer = calc_cer(target, pred)
 
-                beam_wer = calc_wer(target, beam_pred) * 100
-                beam_cer = calc_cer(target, beam_pred) * 100
+                beam_wer = calc_wer(target, beam_pred)
+                beam_cer = calc_cer(target, beam_pred)
 
                 rows[Path(audio_path).name] = {
                     "target": target,

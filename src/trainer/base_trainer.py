@@ -8,6 +8,7 @@ from tqdm.auto import tqdm
 from src.datasets.data_utils import inf_loop
 from src.metrics.tracker import MetricTracker
 from src.utils.io_utils import ROOT_PATH
+from torch.cuda.amp import GradScaler, autocast
 
 
 class BaseTrainer:
@@ -144,6 +145,8 @@ class BaseTrainer:
 
         if config.trainer.get("from_pretrained") is not None:
             self._from_pretrained(config.trainer.get("from_pretrained"))
+        
+        self.scaler = GradScaler()
 
     def train(self):
         """
@@ -205,11 +208,13 @@ class BaseTrainer:
         self.train_metrics.reset()
         self.writer.set_step((epoch - 1) * self.epoch_len)
         self.writer.add_scalar("epoch", epoch)
+
         for batch_idx, batch in enumerate(
             tqdm(self.train_dataloader, desc="train", total=self.epoch_len)
         ):
             try:
                 batch = self.process_batch(
+                    # self.scaler,
                     batch_idx,
                     batch,
                     metrics=self.train_metrics,

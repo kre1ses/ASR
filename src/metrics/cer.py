@@ -26,7 +26,7 @@ class ArgmaxCERMetric(BaseMetric):
             target_text = self.text_encoder.normalize_text(target_text)
             pred_text = self.text_encoder.ctc_decode(log_prob_vec[:length])
             cers.append(calc_cer(target_text, pred_text))
-        return sum(cers) / len(cers) * 100.0
+        return sum(cers) / len(cers)
 
 class BeamSearchCERMetric(BaseMetric):
     def __init__(self, text_encoder, lm_use=False, *args, **kwargs):
