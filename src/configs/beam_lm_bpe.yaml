@@ -3,7 +3,7 @@ defaults:
   - writer: cometml
   - metrics: example
   - datasets: default
-  - dataloader: 32_size
+  - dataloader: 64_size
   - transforms: first_run_only_inst
   - _self_
 optimizer:
@@ -13,7 +13,7 @@ lr_scheduler:
   _target_: torch.optim.lr_scheduler.OneCycleLR
   max_lr: 1e-2
   pct_start: 0.1
-  total_steps: 16000
+  total_steps: 500
   anneal_strategy: cos
 loss_function:
   _target_: src.loss.CTCLossWrapper
@@ -25,7 +25,7 @@ text_encoder:
   vocab_size: 128
   beam_size: 5
 trainer:
-  log_step: 100
+  log_step: 20
   n_epochs: 20
   epoch_len: null
   device_tensors: ["spectrogram", "text_encoded"] # which tensors should be on device (ex. GPU)
