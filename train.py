@@ -11,6 +11,8 @@ from src.utils.init_utils import set_random_seed, setup_saving_and_logging
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
+from accelerate import Accelerator
+
 
 @hydra.main(version_base=None, config_path="src/configs", config_name="baseline")
 def main(config):
@@ -36,9 +38,18 @@ def main(config):
     # setup text_encoder
     text_encoder = instantiate(config.text_encoder)
 
+    use_accelerate = config.trainer.get("use_accelerate", False)
+    accelerator = None
+    if use_accelerate:
+        accelerator = Accelerator(mixed_precision="fp16" if config.trainer.get("fp16", False) else "no")
+
+    dataloaders, batch_transforms = get_dataloaders(
+        config, text_encoder, device, accelerator=accelerator
+    )
+
     # setup data_loader instances
     # batch_transforms should be put on device
-    dataloaders, batch_transforms = get_dataloaders(config, text_encoder, device)
+    # dataloaders, batch_transforms = get_dataloaders(config, text_encoder, device)
 
     # build model architecture, then print to console
     model = instantiate(config.model, n_tokens=len(text_encoder)).to(device)

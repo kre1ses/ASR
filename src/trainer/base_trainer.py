@@ -90,8 +90,16 @@ class BaseTrainer:
 
         # define dataloaders
         self.train_dataloader = dataloaders["train"]
+
         if self.use_accelerate:
-            self._setup_distributed_samplers()
+            self.model, self.optimizer, self.train_dataloader, self.lr_scheduler = self.accelerator.prepare(
+                self.model, self.optimizer, self.train_dataloader, self.lr_scheduler
+            )
+
+            # Для evaluation dataloaders отдельно
+            self.evaluation_dataloaders = {
+                k: self.accelerator.prepare(v) for k, v in self.evaluation_dataloaders.items()
+            }
 
         if epoch_len is None:
             # epoch-based training
@@ -104,16 +112,6 @@ class BaseTrainer:
         self.evaluation_dataloaders = {
             k: v for k, v in dataloaders.items() if k != "train"
         }
-
-        if self.use_accelerate:
-            self.model, self.optimizer, self.train_dataloader, self.lr_scheduler = self.accelerator.prepare(
-                self.model, self.optimizer, self.train_dataloader, self.lr_scheduler
-            )
-
-            # Для evaluation dataloaders отдельно
-            self.evaluation_dataloaders = {
-                k: self.accelerator.prepare(v) for k, v in self.evaluation_dataloaders.items()
-            }
 
         # define epochs
         self._last_epoch = 0  # required for saving on interruption
@@ -176,25 +174,6 @@ class BaseTrainer:
         # else:
         #     self.scaler = None
     
-    def _setup_distributed_samplers(self):
-        train_dataset = self.train_dataloader.dataset
-        self.train_sampler = DistributedSampler(
-            train_dataset,
-            shuffle=True,
-            drop_last=True
-        )
-        
-        self.train_dataloader = torch.utils.data.DataLoader(
-            train_dataset,
-            batch_size=self.train_dataloader.batch_size,
-            sampler=self.train_sampler,
-            num_workers=self.train_dataloader.num_workers,
-            collate_fn=self.train_dataloader.collate_fn,
-            pin_memory=getattr(self.train_dataloader, 'pin_memory', False),
-            drop_last=getattr(self.train_dataloader, 'drop_last', False),
-        )
-        
-        # self.train_dataloader = self.accelerator.prepare(self.train_dataloader)
 
     def train(self):
         """
@@ -255,7 +234,7 @@ class BaseTrainer:
                 this epoch.
         """
         if self.use_accelerate:
-            self.train_sampler.set_epoch(epoch)
+            self.train_dataloader.sampler.set_epoch(epoch)
 
         self.is_train = True
         self.model.train()
