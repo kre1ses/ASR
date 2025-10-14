@@ -10,6 +10,7 @@ from src.metrics.tracker import MetricTracker
 from src.utils.io_utils import ROOT_PATH
 from torch.cuda.amp import GradScaler, autocast
 from accelerate import Accelerator
+from torch.utils.data.distributed import DistributedSampler
 
 
 class BaseTrainer:
@@ -89,6 +90,9 @@ class BaseTrainer:
 
         # define dataloaders
         self.train_dataloader = dataloaders["train"]
+        if self.use_accelerate:
+            self._setup_distributed_samplers()
+
         if epoch_len is None:
             # epoch-based training
             self.epoch_len = len(self.train_dataloader)
@@ -171,6 +175,26 @@ class BaseTrainer:
         #     self.scaler = GradScaler()
         # else:
         #     self.scaler = None
+    
+    def _setup_distributed_samplers(self):
+        train_dataset = self.train_dataloader.dataset
+        self.train_sampler = DistributedSampler(
+            train_dataset,
+            shuffle=True,
+            drop_last=True
+        )
+        
+        self.train_dataloader = torch.utils.data.DataLoader(
+            train_dataset,
+            batch_size=self.train_dataloader.batch_size,
+            sampler=self.train_sampler,
+            num_workers=self.train_dataloader.num_workers,
+            collate_fn=self.train_dataloader.collate_fn,
+            pin_memory=getattr(self.train_dataloader, 'pin_memory', False),
+            drop_last=getattr(self.train_dataloader, 'drop_last', False),
+        )
+        
+        # self.train_dataloader = self.accelerator.prepare(self.train_dataloader)
 
     def train(self):
         """
@@ -230,6 +254,9 @@ class BaseTrainer:
             logs (dict): logs that contain the average loss and metric in
                 this epoch.
         """
+        if self.use_accelerate:
+            self.train_sampler.set_epoch(epoch)
+
         self.is_train = True
         self.model.train()
         self.train_metrics.reset()
