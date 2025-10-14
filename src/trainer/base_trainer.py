@@ -68,7 +68,7 @@ class BaseTrainer:
         self.fp16 = bool(self.cfg_trainer.get("fp16", False))
 
         if self.use_accelerate:
-            self.accelerator = Accelerator(fp16=self.fp16)
+            self.accelerator = Accelerator(mixed_precision="fp16")
         else:
             self.accelerator = None
         
