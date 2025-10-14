@@ -136,7 +136,7 @@ class Trainer(BaseTrainer):
         argmax_inds = log_probs.cpu().argmax(-1).numpy()
         argmax_inds = [
             inds[: int(ind_len)]
-            for inds, ind_len in zip(argmax_inds, log_probs_length.numpy())
+            for inds, ind_len in zip(argmax_inds, log_probs_length.cpu().numpy())
         ]
         argmax_texts_raw = [self.text_encoder.decode(inds) for inds in argmax_inds]
         argmax_texts = [self.text_encoder.ctc_decode(inds) for inds in argmax_inds]
@@ -147,11 +147,11 @@ class Trainer(BaseTrainer):
 
             if self.text_encoder.lm_use:
                 predictions = log_probs.detach().cpu()
-                lengths = log_probs_length.detach()
+                lengths = log_probs_length.cpu().detach()
                 beam_texts = self.text_encoder.ctc_lm_beam_search(predictions, lengths) ############
             else:
                 predictions = log_probs.detach().cpu().numpy()
-                lengths = log_probs_length.detach().numpy()
+                lengths = log_probs_length.cpu().detach().numpy()
                 for log_prob_vec, length in zip(predictions, lengths):
                     beams = self.text_encoder.ctc_beam_search(log_prob_vec[:length])[0][0]
                     beams = beams.lower().replace("'", "").replace("[unk]", "").strip()
