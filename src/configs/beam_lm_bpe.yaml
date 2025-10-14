@@ -12,7 +12,7 @@ optimizer:
 lr_scheduler:
   _target_: torch.optim.lr_scheduler.OneCycleLR
   max_lr: 1e-2
-  pct_start: 0.1
+  pct_start: 0.2
   total_steps: 500
   anneal_strategy: cos
 loss_function:
@@ -23,7 +23,7 @@ text_encoder:
   lm_use: True
   bpe_use: True
   vocab_size: 128
-  beam_size: 5
+  beam_size: 3
 trainer:
   log_step: 20
   n_epochs: 20

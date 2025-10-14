@@ -84,16 +84,12 @@ class Trainer(BaseTrainer):
             #     self.lr_scheduler.step()
 
         # update metrics for each loss (in case of multiple losses)
-        if self.is_train:
-            log_step = 10
-        else:
-            log_step = 1
-        if (batch_idx + 1) % log_step == 0:
-            for loss_name in self.config.writer.loss_names:
-                metrics.update(loss_name, batch[loss_name].item())
-        if (batch_idx + 1) % log_step == 0:
-            for met in metric_funcs:
-                metrics.update(met.name, met(**batch))
+
+        for loss_name in self.config.writer.loss_names:
+            metrics.update(loss_name, batch[loss_name].item())
+
+        for met in metric_funcs:
+            metrics.update(met.name, met(**batch))
         return batch
 
     def _log_batch(self, batch_idx, batch, mode="train"):
