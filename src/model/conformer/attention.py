@@ -70,7 +70,7 @@ class RelativeMultiHeadSelfAttentionBlock(nn.Module):
 
         if mask is not None:
             mask = mask.unsqueeze(1).unsqueeze(2)
-            scores.masked_fill_(mask, -1e10)
+            scores.masked_fill_(mask, -1e4)
 
         scores = F.softmax(scores, dim=-1)
         scores = self.dropout(scores)
