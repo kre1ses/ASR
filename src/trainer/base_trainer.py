@@ -72,7 +72,7 @@ class BaseTrainer:
         else:
             self.accelerator = None
         
-        self.is_main_process = True if not self.use_accelerate else self.accelerator.is_main_process
+        self.accelerator.is_main_process = True if not self.use_accelerate else self.accelerator.is_main_process
 
         self.device = device
         self.skip_oom = skip_oom
@@ -207,7 +207,7 @@ class BaseTrainer:
             logs.update(result)
 
             # print logged information to the screen
-            if self.is_main_process:
+            if self.accelerator.is_main_process:
                 for key, value in logs.items():
                     self.logger.info(f"    {key:15s}: {value}")
 
@@ -217,7 +217,7 @@ class BaseTrainer:
                 logs, not_improved_count
             )
             
-            if self.is_main_process:
+            if self.accelerator.is_main_process:
                 if epoch % self.save_period == 0 or best:
                     self._save_checkpoint(epoch, save_best=best, only_best=True)
 
@@ -238,7 +238,7 @@ class BaseTrainer:
         self.is_train = True
         self.model.train()
         self.train_metrics.reset()
-        if self.is_main_process:
+        if self.accelerator.is_main_process:
             self.writer.set_step((epoch - 1) * self.epoch_len)
             self.writer.add_scalar("epoch", epoch)
 
@@ -263,7 +263,7 @@ class BaseTrainer:
             self.train_metrics.update("grad_norm", self._get_grad_norm())
 
             # log current results
-            if self.is_main_process:
+            if self.accelerator.is_main_process:
                 if batch_idx % self.log_step == 0:
                     self.writer.set_step((epoch - 1) * self.epoch_len + batch_idx)
                     self.logger.debug(
@@ -289,6 +289,8 @@ class BaseTrainer:
         for part, dataloader in self.evaluation_dataloaders.items():
             val_logs = self._evaluation_epoch(epoch, part, dataloader)
             logs.update(**{f"{part}_{name}": value for name, value in val_logs.items()})
+
+        self.accelerator.wait_for_everyone()
 
         return logs
 
@@ -317,7 +319,7 @@ class BaseTrainer:
                     batch,
                     metrics=self.evaluation_metrics,
                 )
-            if self.is_main_process:
+            if self.accelerator.is_main_process:
                 self.writer.set_step(epoch * self.epoch_len, part)
                 self._log_scalars(self.evaluation_metrics)
                 self._log_batch(
@@ -356,7 +358,7 @@ class BaseTrainer:
                 else:
                     improved = False
             except KeyError:
-                if self.is_main_process:
+                if self.accelerator.is_main_process:
                     self.logger.warning(
                         f"Warning: Metric '{self.mnt_metric}' is not found. "
                         "Model performance monitoring is disabled."
@@ -372,7 +374,7 @@ class BaseTrainer:
                 not_improved_count += 1
 
             if not_improved_count >= self.early_stop:
-                if self.is_main_process:
+                if self.accelerator.is_main_process:
                     self.logger.info(
                         "Validation performance didn't improve for {} epochs. "
                         "Training stops.".format(self.early_stop)
@@ -493,7 +495,7 @@ class BaseTrainer:
         Args:
             metric_tracker (MetricTracker): calculated metrics.
         """
-        if self.writer is None or not self.is_main_process:
+        if self.writer is None or not self.accelerator.is_main_process:
             return
         for metric_name in metric_tracker.keys():
             self.writer.add_scalar(f"{metric_name}", metric_tracker.avg(metric_name))
@@ -509,7 +511,7 @@ class BaseTrainer:
                 'model_best.pth'(do not duplicate the checkpoint as
                 checkpoint-epochEpochNumber.pth)
         """
-        if not self.is_main_process:
+        if not self.accelerator.is_main_process:
             return
         
         model_to_save = (
@@ -552,14 +554,14 @@ class BaseTrainer:
             resume_path (str): Path to the checkpoint to be resumed.
         """
         resume_path = str(resume_path)
-        if self.is_main_process:
+        if self.accelerator.is_main_process:
             self.logger.info(f"Loading checkpoint: {resume_path} ...")
         checkpoint = torch.load(resume_path, self.device)
         self.start_epoch = checkpoint["epoch"] + 1
         self.mnt_best = checkpoint["monitor_best"]
 
         # load architecture params from checkpoint.
-        if checkpoint["config"]["model"] != self.config["model"] and self.is_main_process:
+        if checkpoint["config"]["model"] != self.config["model"] and self.accelerator.is_main_process:
             self.logger.warning(
                 "Warning: Architecture configuration given in the config file is different from that "
                 "of the checkpoint. This may yield an exception when state_dict is loaded."
@@ -574,7 +576,7 @@ class BaseTrainer:
             checkpoint["config"]["optimizer"] != self.config["optimizer"]
             or checkpoint["config"]["lr_scheduler"] != self.config["lr_scheduler"]
         ):
-            if self.is_main_process:
+            if self.accelerator.is_main_process:
                 self.logger.warning(
                     "Warning: Optimizer or lr_scheduler given in the config file is different "
                     "from that of the checkpoint. Optimizer and scheduler parameters "
@@ -583,7 +585,7 @@ class BaseTrainer:
         else:
             self.optimizer.load_state_dict(checkpoint["optimizer"])
             self.lr_scheduler.load_state_dict(checkpoint["lr_scheduler"])
-        if self.is_main_process:
+        if self.accelerator.is_main_process:
             self.logger.info(
                 f"Checkpoint loaded. Resume training from epoch {self.start_epoch}"
             )
@@ -600,7 +602,7 @@ class BaseTrainer:
             pretrained_path (str): path to the model state dict.
         """
         pretrained_path = str(pretrained_path)
-        if self.is_main_process:
+        if self.accelerator.is_main_process:
             if hasattr(self, "logger"):  # to support both trainer and inferencer
                 self.logger.info(f"Loading model weights from: {pretrained_path} ...")
             else:
