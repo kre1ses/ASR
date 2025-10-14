@@ -101,7 +101,7 @@ class Trainer(BaseTrainer):
         """
         # method to log data from you batch
         # such as audio, text or images, for example
-        if not self.is_main_process:
+        if not self.accelerator.is_main_process:
             return
 
         # logging scheme might be different for different partitions
