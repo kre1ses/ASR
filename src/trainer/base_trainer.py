@@ -72,7 +72,7 @@ class BaseTrainer:
         else:
             self.accelerator = None
         
-        self.accelerator.is_main_process = True if not self.use_accelerate else self.accelerator.is_main_process
+        # self.accelerator.is_main_process = True if not self.use_accelerate else self.accelerator.is_main_process
 
         self.device = device
         self.skip_oom = skip_oom
