@@ -97,8 +97,15 @@ class BaseTrainer:
             )
 
             # Для evaluation dataloaders отдельно
+            self.evaluation_dataloaders = {}
+            for name, loader in dataloaders.items():
+                if name != "train":
+                    self.evaluation_dataloaders[name] = self.accelerator.prepare(loader)
+        else:
+            # Стандартная инициализация без accelerate
+            self.train_dataloader = dataloaders["train"]
             self.evaluation_dataloaders = {
-                k: self.accelerator.prepare(v) for k, v in self.evaluation_dataloaders.items()
+                k: v for k, v in dataloaders.items() if k != "train"
             }
 
         if epoch_len is None:
