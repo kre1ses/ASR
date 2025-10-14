@@ -255,6 +255,7 @@ class BaseTrainer:
         for batch_idx, batch in enumerate(
             tqdm(self.train_dataloader, desc="train", total=self.epoch_len)
         ):
+            self.train_metrics.reset()
             try:
                 batch = self.process_batch(
                     # self.scaler,
@@ -289,11 +290,12 @@ class BaseTrainer:
                     # we don't want to reset train metrics at the start of every epoch
                     # because we are interested in recent train metrics
                     last_train_metrics = self.train_metrics.result()
-                    self.train_metrics.reset()
+                    # self.train_metrics.reset()
             if batch_idx + 1 >= self.epoch_len:
                 break
 
-        logs = last_train_metrics
+        logs = self.train_metrics.result()
+        self.train_metrics.reset()
 
         # Run val/test
         for part, dataloader in self.evaluation_dataloaders.items():
