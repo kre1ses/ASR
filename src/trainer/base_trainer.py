@@ -9,6 +9,7 @@ from src.datasets.data_utils import inf_loop
 from src.metrics.tracker import MetricTracker
 from src.utils.io_utils import ROOT_PATH
 from torch.cuda.amp import GradScaler, autocast
+from accelerate import Accelerator
 
 
 class BaseTrainer:
@@ -63,6 +64,16 @@ class BaseTrainer:
         self.config = config
         self.cfg_trainer = self.config.trainer
 
+        self.use_accelerate = bool(self.cfg_trainer.get("use_accelerate", False))
+        self.fp16 = bool(self.cfg_trainer.get("fp16", False))
+
+        if self.use_accelerate:
+            self.accelerator = Accelerator(fp16=self.fp16)
+        else:
+            self.accelerator = None
+        
+        self.is_main_process = True if not self.use_accelerate else self.accelerator.is_main_process
+
         self.device = device
         self.skip_oom = skip_oom
 
@@ -89,6 +100,21 @@ class BaseTrainer:
         self.evaluation_dataloaders = {
             k: v for k, v in dataloaders.items() if k != "train"
         }
+
+        if self.use_accelerate:
+            items = [self.model, self.optimizer, self.train_dataloader] + list(self.evaluation_dataloaders.values())
+            items.append(self.lr_scheduler)
+            prepared = self.accelerator.prepare(*items)
+
+            self.model = prepared[0]
+            self.optimizer = prepared[1]
+            self.train_dataloader = prepared[2]
+
+            eval_keys = list(self.evaluation_dataloaders.keys())
+            for i, k in enumerate(eval_keys):
+                self.evaluation_dataloaders[k] = prepared[3 + i]
+            
+            self.lr_scheduler = prepared[-1]
 
         # define epochs
         self._last_epoch = 0  # required for saving on interruption
@@ -146,7 +172,10 @@ class BaseTrainer:
         if config.trainer.get("from_pretrained") is not None:
             self._from_pretrained(config.trainer.get("from_pretrained"))
         
-        self.scaler = GradScaler()
+        if not self.use_accelerate:
+            self.scaler = GradScaler()
+        else:
+            self.scaler = None
 
     def train(self):
         """
@@ -155,8 +184,9 @@ class BaseTrainer:
         try:
             self._train_process()
         except KeyboardInterrupt as e:
-            self.logger.info("Saving model on keyboard interrupt")
-            self._save_checkpoint(self._last_epoch, save_best=False)
+            if self.is_main_process:
+                self.logger.info("Saving model on keyboard interrupt")
+                self._save_checkpoint(self._last_epoch, save_best=False)
             raise e
 
     def _train_process(self):
@@ -177,17 +207,19 @@ class BaseTrainer:
             logs.update(result)
 
             # print logged information to the screen
-            for key, value in logs.items():
-                self.logger.info(f"    {key:15s}: {value}")
+            if self.is_main_process:
+                for key, value in logs.items():
+                    self.logger.info(f"    {key:15s}: {value}")
 
             # evaluate model performance according to configured metric,
             # save best checkpoint as model_best
             best, stop_process, not_improved_count = self._monitor_performance(
                 logs, not_improved_count
             )
-
-            if epoch % self.save_period == 0 or best:
-                self._save_checkpoint(epoch, save_best=best, only_best=True)
+            
+            if self.is_main_process:
+                if epoch % self.save_period == 0 or best:
+                    self._save_checkpoint(epoch, save_best=best, only_best=True)
 
             if stop_process:  # early_stop
                 break
@@ -206,8 +238,9 @@ class BaseTrainer:
         self.is_train = True
         self.model.train()
         self.train_metrics.reset()
-        self.writer.set_step((epoch - 1) * self.epoch_len)
-        self.writer.add_scalar("epoch", epoch)
+        if self.is_main_process:
+            self.writer.set_step((epoch - 1) * self.epoch_len)
+            self.writer.add_scalar("epoch", epoch)
 
         for batch_idx, batch in enumerate(
             tqdm(self.train_dataloader, desc="train", total=self.epoch_len)
@@ -230,22 +263,23 @@ class BaseTrainer:
             self.train_metrics.update("grad_norm", self._get_grad_norm())
 
             # log current results
-            if batch_idx % self.log_step == 0:
-                self.writer.set_step((epoch - 1) * self.epoch_len + batch_idx)
-                self.logger.debug(
-                    "Train Epoch: {} {} Loss: {:.6f}".format(
-                        epoch, self._progress(batch_idx), batch["loss"].item()
+            if self.is_main_process:
+                if batch_idx % self.log_step == 0:
+                    self.writer.set_step((epoch - 1) * self.epoch_len + batch_idx)
+                    self.logger.debug(
+                        "Train Epoch: {} {} Loss: {:.6f}".format(
+                            epoch, self._progress(batch_idx), batch["loss"].item()
+                        )
                     )
-                )
-                self.writer.add_scalar(
-                    "learning rate", self.lr_scheduler.get_last_lr()[0]
-                )
-                self._log_scalars(self.train_metrics)
-                self._log_batch(batch_idx, batch)
-                # we don't want to reset train metrics at the start of every epoch
-                # because we are interested in recent train metrics
-                last_train_metrics = self.train_metrics.result()
-                self.train_metrics.reset()
+                    self.writer.add_scalar(
+                        "learning rate", self.lr_scheduler.get_last_lr()[0]
+                    )
+                    self._log_scalars(self.train_metrics)
+                    self._log_batch(batch_idx, batch)
+                    # we don't want to reset train metrics at the start of every epoch
+                    # because we are interested in recent train metrics
+                    last_train_metrics = self.train_metrics.result()
+                    self.train_metrics.reset()
             if batch_idx + 1 >= self.epoch_len:
                 break
 
@@ -283,11 +317,12 @@ class BaseTrainer:
                     batch,
                     metrics=self.evaluation_metrics,
                 )
-            self.writer.set_step(epoch * self.epoch_len, part)
-            self._log_scalars(self.evaluation_metrics)
-            self._log_batch(
-                batch_idx, batch, part
-            )  # log only the last batch during inference
+            if self.is_main_process:
+                self.writer.set_step(epoch * self.epoch_len, part)
+                self._log_scalars(self.evaluation_metrics)
+                self._log_batch(
+                    batch_idx, batch, part
+                )  # log only the last batch during inference
 
         return self.evaluation_metrics.result()
 
@@ -321,10 +356,11 @@ class BaseTrainer:
                 else:
                     improved = False
             except KeyError:
-                self.logger.warning(
-                    f"Warning: Metric '{self.mnt_metric}' is not found. "
-                    "Model performance monitoring is disabled."
-                )
+                if self.is_main_process:
+                    self.logger.warning(
+                        f"Warning: Metric '{self.mnt_metric}' is not found. "
+                        "Model performance monitoring is disabled."
+                    )
                 self.mnt_mode = "off"
                 improved = False
 
@@ -336,10 +372,11 @@ class BaseTrainer:
                 not_improved_count += 1
 
             if not_improved_count >= self.early_stop:
-                self.logger.info(
-                    "Validation performance didn't improve for {} epochs. "
-                    "Training stops.".format(self.early_stop)
-                )
+                if self.is_main_process:
+                    self.logger.info(
+                        "Validation performance didn't improve for {} epochs. "
+                        "Training stops.".format(self.early_stop)
+                    )
                 stop_process = True
         return best, stop_process, not_improved_count
 
@@ -456,7 +493,7 @@ class BaseTrainer:
         Args:
             metric_tracker (MetricTracker): calculated metrics.
         """
-        if self.writer is None:
+        if self.writer is None or not self.is_main_process:
             return
         for metric_name in metric_tracker.keys():
             self.writer.add_scalar(f"{metric_name}", metric_tracker.avg(metric_name))
@@ -472,11 +509,18 @@ class BaseTrainer:
                 'model_best.pth'(do not duplicate the checkpoint as
                 checkpoint-epochEpochNumber.pth)
         """
-        arch = type(self.model).__name__
+        if not self.is_main_process:
+            return
+        
+        model_to_save = (
+            self.accelerator.unwrap_model(self.model) if self.use_accelerate else self.model
+        )
+
+        arch = type(model_to_save).__name__
         state = {
             "arch": arch,
             "epoch": epoch,
-            "state_dict": self.model.state_dict(),
+            "state_dict": model_to_save.state_dict(),
             "optimizer": self.optimizer.state_dict(),
             "lr_scheduler": self.lr_scheduler.state_dict(),
             "monitor_best": self.mnt_best,
@@ -508,17 +552,21 @@ class BaseTrainer:
             resume_path (str): Path to the checkpoint to be resumed.
         """
         resume_path = str(resume_path)
-        self.logger.info(f"Loading checkpoint: {resume_path} ...")
+        if self.is_main_process:
+            self.logger.info(f"Loading checkpoint: {resume_path} ...")
         checkpoint = torch.load(resume_path, self.device)
         self.start_epoch = checkpoint["epoch"] + 1
         self.mnt_best = checkpoint["monitor_best"]
 
         # load architecture params from checkpoint.
-        if checkpoint["config"]["model"] != self.config["model"]:
+        if checkpoint["config"]["model"] != self.config["model"] and self.is_main_process:
             self.logger.warning(
                 "Warning: Architecture configuration given in the config file is different from that "
                 "of the checkpoint. This may yield an exception when state_dict is loaded."
             )
+        self.model = (
+            self.accelerator.unwrap_model(self.model) if self.use_accelerate else self.model
+        )
         self.model.load_state_dict(checkpoint["state_dict"])
 
         # load optimizer state from checkpoint only when optimizer type is not changed.
@@ -526,18 +574,19 @@ class BaseTrainer:
             checkpoint["config"]["optimizer"] != self.config["optimizer"]
             or checkpoint["config"]["lr_scheduler"] != self.config["lr_scheduler"]
         ):
-            self.logger.warning(
-                "Warning: Optimizer or lr_scheduler given in the config file is different "
-                "from that of the checkpoint. Optimizer and scheduler parameters "
-                "are not resumed."
-            )
+            if self.is_main_process:
+                self.logger.warning(
+                    "Warning: Optimizer or lr_scheduler given in the config file is different "
+                    "from that of the checkpoint. Optimizer and scheduler parameters "
+                    "are not resumed."
+                )
         else:
             self.optimizer.load_state_dict(checkpoint["optimizer"])
             self.lr_scheduler.load_state_dict(checkpoint["lr_scheduler"])
-
-        self.logger.info(
-            f"Checkpoint loaded. Resume training from epoch {self.start_epoch}"
-        )
+        if self.is_main_process:
+            self.logger.info(
+                f"Checkpoint loaded. Resume training from epoch {self.start_epoch}"
+            )
 
     def _from_pretrained(self, pretrained_path):
         """
@@ -551,11 +600,16 @@ class BaseTrainer:
             pretrained_path (str): path to the model state dict.
         """
         pretrained_path = str(pretrained_path)
-        if hasattr(self, "logger"):  # to support both trainer and inferencer
-            self.logger.info(f"Loading model weights from: {pretrained_path} ...")
-        else:
-            print(f"Loading model weights from: {pretrained_path} ...")
+        if self.is_main_process:
+            if hasattr(self, "logger"):  # to support both trainer and inferencer
+                self.logger.info(f"Loading model weights from: {pretrained_path} ...")
+            else:
+                print(f"Loading model weights from: {pretrained_path} ...")
         checkpoint = torch.load(pretrained_path, self.device, weights_only=False)
+
+        self.model = (
+            self.accelerator.unwrap_model(self.model) if self.use_accelerate else self.model
+            )
 
         if checkpoint.get("state_dict") is not None:
             self.model.load_state_dict(checkpoint["state_dict"])

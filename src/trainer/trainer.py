@@ -8,6 +8,8 @@ from src.metrics.utils import calc_cer, calc_wer
 from src.trainer.base_trainer import BaseTrainer
 
 from torch.cuda.amp import GradScaler, autocast
+from accelerate import Accelerator
+import torch
 
 
 class Trainer(BaseTrainer):
@@ -42,23 +44,40 @@ class Trainer(BaseTrainer):
             metric_funcs = self.metrics["train"]
             if (batch_idx + 1) % 4 == 0:
                 self.optimizer.zero_grad()
-        with autocast():
+        
+        if self.use_accelerate:
+            autocast_ctx = self.accelerator.autocast
+        else:
+            # fallback to torch.cuda.amp.autocast
+            autocast_ctx = torch.cuda.amp.autocast
+
+        with autocast_ctx():
             outputs = self.model(**batch)
         batch.update(outputs)
 
-        with autocast():
+        with autocast_ctx():
             all_losses = self.criterion(**batch)
         batch.update(all_losses)
 
         if self.is_train:
-            self.scaler.scale(batch["loss"]).backward()  # sum of all losses is always called loss
-            self._clip_grad_norm()
-            if (batch_idx + 1) % 4 == 0:
-                self.scaler.step(self.optimizer)
-                # self.optimizer.step()
-            if self.lr_scheduler is not None:
+            if self.use_accelerate:
+                self.accelerator.backward(batch["loss"])
+                self._clip_grad_norm()
+
+                if (batch_idx + 1) % 4 == 0:
+                    self.optimizer.step()
+
                 self.lr_scheduler.step()
-            self.scaler.update()
+
+            else:
+                self.scaler.scale(batch["loss"]).backward()
+                self._clip_grad_norm()
+
+                if (batch_idx + 1) % 4 == 0:
+                    self.scaler.step(self.optimizer)
+                    self.scaler.update()
+
+                self.lr_scheduler.step()
 
         # update metrics for each loss (in case of multiple losses)
         for loss_name in self.config.writer.loss_names:
@@ -82,6 +101,8 @@ class Trainer(BaseTrainer):
         """
         # method to log data from you batch
         # such as audio, text or images, for example
+        if not self.is_main_process:
+            return
 
         # logging scheme might be different for different partitions
         if mode == "train":  # the method is called only every self.log_step steps

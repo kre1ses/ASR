@@ -1,7 +1,7 @@
 _target_: src.logger.CometMLWriter
 project_name: "asr-hw"
 workspace: null
-run_name: "beam_lm_bpe" # if null, then will use the default name given by CometML
+run_name: "beam_lm_bpe_new" # if null, then will use the default name given by CometML
 mode: "online"
 loss_names: ["loss"] # which losses to log (useful for multi-loss tasks, s.a. GANs)
 log_checkpoints: False # set to True if you want to log save_dir with checkpoints to W&B
