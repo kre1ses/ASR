@@ -45,22 +45,21 @@ class Trainer(BaseTrainer):
             if (batch_idx + 1) % 4 == 0:
                 self.optimizer.zero_grad()
         
-        if self.use_accelerate:
-            autocast_ctx = self.accelerator.autocast
-        else:
-            autocast_ctx = torch.cuda.amp.autocast
-        if self.use_accelerate:
-            with self.accelerator.accumulate(self.model):
-                with autocast_ctx():
-                    outputs = self.model(**batch)
-        batch.update(outputs)
-
-        with autocast_ctx():
-            all_losses = self.criterion(**batch)
-        batch.update(all_losses)
-
+        # if self.use_accelerate:
+        #     autocast_ctx = self.accelerator.autocast
+        # else:
+        #     autocast_ctx = torch.cuda.amp.autocast
         if self.is_train:
-            if self.use_accelerate:
+            with self.accelerator.accumulate(self.model):
+                outputs = self.model(**batch)
+                batch.update(outputs)
+
+        # with autocast_ctx():
+                all_losses = self.criterion(**batch)
+                batch.update(all_losses)
+
+        # if self.is_train:
+            # if self.use_accelerate:
                 self.accelerator.backward(batch["loss"])
                 self._clip_grad_norm()
 
@@ -68,16 +67,21 @@ class Trainer(BaseTrainer):
                     self.optimizer.step()
 
                 self.lr_scheduler.step()
+        else:
+            outputs = self.model(**batch)
+            batch.update(outputs)
+            all_losses = self.criterion(**batch)
+            batch.update(all_losses)
 
-            else:
-                self.scaler.scale(batch["loss"]).backward()
-                self._clip_grad_norm()
+            # else:
+            #     self.scaler.scale(batch["loss"]).backward()
+            #     self._clip_grad_norm()
 
-                if (batch_idx + 1) % 4 == 0:
-                    self.scaler.step(self.optimizer)
-                    self.scaler.update()
+            #     if (batch_idx + 1) % 4 == 0:
+            #         self.scaler.step(self.optimizer)
+            #         self.scaler.update()
 
-                self.lr_scheduler.step()
+            #     self.lr_scheduler.step()
 
         # update metrics for each loss (in case of multiple losses)
         for loss_name in self.config.writer.loss_names:

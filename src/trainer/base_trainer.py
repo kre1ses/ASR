@@ -102,19 +102,14 @@ class BaseTrainer:
         }
 
         if self.use_accelerate:
-            items = [self.model, self.optimizer, self.train_dataloader] + list(self.evaluation_dataloaders.values())
-            items.append(self.lr_scheduler)
-            prepared = self.accelerator.prepare(*items)
+            self.model, self.optimizer, self.train_dataloader, self.lr_scheduler = self.accelerator.prepare(
+                self.model, self.optimizer, self.train_dataloader, self.lr_scheduler
+            )
 
-            self.model = prepared[0]
-            self.optimizer = prepared[1]
-            self.train_dataloader = prepared[2]
-
-            eval_keys = list(self.evaluation_dataloaders.keys())
-            for i, k in enumerate(eval_keys):
-                self.evaluation_dataloaders[k] = prepared[3 + i]
-            
-            self.lr_scheduler = prepared[-1]
+            # Для evaluation dataloaders отдельно
+            self.evaluation_dataloaders = {
+                k: self.accelerator.prepare(v) for k, v in self.evaluation_dataloaders.items()
+            }
 
         # define epochs
         self._last_epoch = 0  # required for saving on interruption
@@ -172,10 +167,10 @@ class BaseTrainer:
         if config.trainer.get("from_pretrained") is not None:
             self._from_pretrained(config.trainer.get("from_pretrained"))
         
-        if not self.use_accelerate:
-            self.scaler = GradScaler()
-        else:
-            self.scaler = None
+        # if not self.use_accelerate:
+        #     self.scaler = GradScaler()
+        # else:
+        #     self.scaler = None
 
     def train(self):
         """
