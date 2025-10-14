@@ -51,7 +51,7 @@ class BeamSearchWERMetric(BaseMetric):
             return sum(cers) / len(cers)
 
         predictions = log_probs.cpu().detach().numpy()
-        lengths = log_probs_length.detach().numpy()
+        lengths = log_probs_length.detach().cpu().numpy()
 
         for log_prob_vec, length, target_text in zip(predictions, lengths, text):
 
