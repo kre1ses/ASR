@@ -48,11 +48,11 @@ class Trainer(BaseTrainer):
         if self.use_accelerate:
             autocast_ctx = self.accelerator.autocast
         else:
-            # fallback to torch.cuda.amp.autocast
             autocast_ctx = torch.cuda.amp.autocast
-
-        with autocast_ctx():
-            outputs = self.model(**batch)
+        if self.use_accelerate:
+            with self.accelerator.accumulate(self.model):
+                with autocast_ctx():
+                    outputs = self.model(**batch)
         batch.update(outputs)
 
         with autocast_ctx():
