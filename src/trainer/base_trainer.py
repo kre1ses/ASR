@@ -241,7 +241,9 @@ class BaseTrainer:
                 this epoch.
         """
         if self.use_accelerate:
-            self.train_dataloader.sampler.set_epoch(epoch)
+            if (hasattr(self.train_dataloader, 'sampler') and 
+                hasattr(self.train_dataloader.sampler, 'set_epoch')):
+                self.train_dataloader.sampler.set_epoch(epoch)
 
         self.is_train = True
         self.model.train()
