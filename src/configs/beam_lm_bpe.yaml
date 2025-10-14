@@ -3,7 +3,7 @@ defaults:
   - writer: cometml
   - metrics: example
   - datasets: default
-  - dataloader: 16_size
+  - dataloader: 32_size
   - transforms: first_run_only_inst
   - _self_
 optimizer:
