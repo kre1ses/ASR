@@ -72,8 +72,6 @@ class BaseTrainer:
             self.accelerator = Accelerator(mixed_precision="fp16")
         else:
             self.accelerator = None
-        
-        # self.accelerator.is_main_process = True if not self.use_accelerate else self.accelerator.is_main_process
 
         self.device = device
         self.skip_oom = skip_oom
@@ -96,13 +94,12 @@ class BaseTrainer:
                 self.model, self.optimizer, self.train_dataloader, self.lr_scheduler
             )
 
-            # Для evaluation dataloaders отдельно
             self.evaluation_dataloaders = {}
             for name, loader in dataloaders.items():
                 if name != "train":
                     self.evaluation_dataloaders[name] = self.accelerator.prepare(loader)
         else:
-            # Стандартная инициализация без accelerate
+
             self.train_dataloader = dataloaders["train"]
             self.evaluation_dataloaders = {
                 k: v for k, v in dataloaders.items() if k != "train"
@@ -175,12 +172,6 @@ class BaseTrainer:
 
         if config.trainer.get("from_pretrained") is not None:
             self._from_pretrained(config.trainer.get("from_pretrained"))
-        
-        # if not self.use_accelerate:
-        #     self.scaler = GradScaler()
-        # else:
-        #     self.scaler = None
-    
 
     def train(self):
         """
@@ -258,7 +249,6 @@ class BaseTrainer:
             self.train_metrics.reset()
             try:
                 batch = self.process_batch(
-                    # self.scaler,
                     batch_idx,
                     batch,
                     metrics=self.train_metrics,
