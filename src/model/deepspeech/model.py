@@ -62,7 +62,7 @@ class DeepSpeechV2Model(nn.Module):
 
         log_probs = nn.functional.softmax(output, dim=-1)
 
-        log_probs_length = self._compute_shapes(spectrogram_lengths, index=0)
+        log_probs_length = self.compute_shapes(spectrogram_lengths, index=0)
 
         d = {
             'log_probs': log_probs,
