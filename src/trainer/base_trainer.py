@@ -259,6 +259,9 @@ class BaseTrainer:
                 # because we are interested in recent train metrics
                 last_train_metrics = self.train_metrics.result()
                 self.train_metrics.reset()
+
+                # self.train_metrics.reset()
+
             if batch_idx + 1 >= self.epoch_len:
                 break
 
