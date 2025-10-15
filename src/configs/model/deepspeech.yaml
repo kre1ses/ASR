@@ -1,0 +1,2 @@
+_target_: src.model.deepspeech.model.eepSpeechV2Model
+input_dim: 80
