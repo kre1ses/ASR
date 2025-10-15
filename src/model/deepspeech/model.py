@@ -39,7 +39,7 @@ class DeepSpeechV2Model(nn.Module):
         
         self.convs = nn.Sequential(*convs)
 
-        input_size = self._compute_shapes_after_convs(input_dim, index=1) * n_channels[-1]
+        input_size = self.compute_shapes(input_dim, index=1) * n_channels[-1]
 
         self.rnn = LayerNormBiGRU(input_size=input_size, hidden_size=fc_hidden,
                                   num_layers=n_layers)
