@@ -46,20 +46,19 @@ class Trainer(BaseTrainer):
                 self.optimizer.zero_grad()
         
         if self.is_train:
-            with self.accelerator.accumulate(self.model):
-                outputs = self.model(**batch)
-                batch.update(outputs)
+            outputs = self.model(**batch)
+            batch.update(outputs)
 
-                all_losses = self.criterion(**batch)
-                batch.update(all_losses)
+            all_losses = self.criterion(**batch)
+            batch.update(all_losses)
 
-                self.accelerator.backward(batch["loss"])
-                self._clip_grad_norm()
+            batch["loss"].backward()
+            self._clip_grad_norm()
 
-                if (batch_idx + 1) % 4 == 0:
-                    self.optimizer.step()
+            if (batch_idx + 1) % 4 == 0:
+                self.optimizer.step()
 
-                self.lr_scheduler.step()
+            self.lr_scheduler.step()
         else:
             outputs = self.model(**batch)
             batch.update(outputs)
@@ -89,8 +88,7 @@ class Trainer(BaseTrainer):
         """
         # method to log data from you batch
         # such as audio, text or images, for example
-        if not self.accelerator.is_main_process:
-            return
+
 
         # logging scheme might be different for different partitions
         if mode == "train":  # the method is called only every self.log_step steps
