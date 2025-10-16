@@ -102,10 +102,6 @@ class BaseTrainer:
             self.train_dataloader = inf_loop(self.train_dataloader)
             self.epoch_len = epoch_len
 
-        self.evaluation_dataloaders = {
-            k: v for k, v in dataloaders.items() if k != "train"
-        }
-
         # define epochs
         self._last_epoch = 0  # required for saving on interruption
         self.start_epoch = 1
@@ -229,7 +225,7 @@ class BaseTrainer:
         for batch_idx, batch in enumerate(
             tqdm(self.train_dataloader, desc="train", total=self.epoch_len)
         ):
-            self.train_metrics.reset()
+            # self.train_metrics.reset()
             try:
                 batch = self.process_batch(
                     batch_idx,
@@ -262,12 +258,12 @@ class BaseTrainer:
                 # we don't want to reset train metrics at the start of every epoch
                 # because we are interested in recent train metrics
                 last_train_metrics = self.train_metrics.result()
-                # self.train_metrics.reset()
+                self.train_metrics.reset()
             if batch_idx + 1 >= self.epoch_len:
                 break
 
-        logs = self.train_metrics.result()
-        self.train_metrics.reset()
+        logs = last_train_metrics
+        # self.train_metrics.reset()
 
         # Run val/test
         for part, dataloader in self.evaluation_dataloaders.items():
