@@ -1,0 +1,42 @@
+defaults:
+  - model: test_conf
+  - writer: test_conf
+  - metrics: example
+  - datasets: one_batch_test_norm
+  - dataloader: 32_size
+  - transforms: first_run_only_inst
+  - _self_
+optimizer:
+  _target_: torch.optim.AdamW
+  lr: 3e-4
+lr_scheduler:
+  _target_: torch.optim.lr_scheduler.OneCycleLR
+  max_lr: 1e-3
+  pct_start: 0.2
+  total_steps: 50
+  anneal_strategy: cos
+loss_function:
+  _target_: src.loss.CTCLossWrapper
+text_encoder:
+  _target_: src.text_encoder.CTCTextEncoder
+  beam_use: True
+  lm_use: False
+  bpe_use: False
+  vocab_size: 128
+  beam_size: 3
+trainer:
+  log_step: 1
+  n_epochs: 100
+  epoch_len: null
+  device_tensors: ["spectrogram", "text_encoded"] # which tensors should be on device (ex. GPU)
+  resume_from: null # null or path to the checkpoint dir with *.pth and config.yaml
+  device: auto # device name or "auto"
+  override: True # if True, will override the previous run with the same name
+  monitor: "min val_WER_(Argmax)" # "off" or "max/min metric_name", i.e. our goal is to maximize/minimize metric
+  save_period: 5 # checkpoint each save_period epochs in addition to the best epoch
+  early_stop: ${trainer.n_epochs} # epochs for early stopping
+  save_dir: "saved"
+  seed: 1
+  use_accelerate: False
+  fp16: False
+  max_grad_norm: 5
