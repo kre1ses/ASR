@@ -8,13 +8,11 @@ defaults:
   - _self_
 optimizer:
   _target_: torch.optim.AdamW
-  lr: 3e-4
+  lr: 1
 lr_scheduler:
-  _target_: torch.optim.lr_scheduler.OneCycleLR
-  max_lr: 1e-3
-  pct_start: 0.2
-  total_steps: 50
-  anneal_strategy: cos
+  _target_: src.model.NoamScheduler
+  d_model: 176
+  warmup_steps: 50
 loss_function:
   _target_: src.loss.CTCLossWrapper
 text_encoder:

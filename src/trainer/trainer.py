@@ -58,7 +58,7 @@ class Trainer(BaseTrainer):
             if (batch_idx + 1) % 4 == 0:
                 self.optimizer.step()
 
-            self.lr_scheduler.step()
+                self.lr_scheduler.step()
         else:
             outputs = self.model(**batch)
             batch.update(outputs)
