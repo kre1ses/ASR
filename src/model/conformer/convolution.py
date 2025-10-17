@@ -84,6 +84,7 @@ class Conv2dSubsampling(nn.Module):
     
     def forward(self, x: torch.Tensor, input_lengths: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         x = x.unsqueeze(1)  # (batch_size, 1, seq_len, freq)
+        x = x.transpose(2, 3)  # (batch_size, 1, freq, seq_len)
         x = self.conv(x)  # (batch_size, channels, seq_len', freq')
         batch_size, channels, subsampled_seq_len, subsampled_freq = x.size()
         x = x.transpose(1, 2).contiguous().view(batch_size, subsampled_seq_len, channels * subsampled_freq)

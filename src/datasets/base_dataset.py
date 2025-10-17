@@ -90,7 +90,7 @@ class BaseDataset(Dataset):
             audio = self.instance_transforms["audio"](audio)
 
         spectrogram = self.get_spectrogram(audio)
-        spectrogram = torch.log(spectrogram + self.eps).squeeze() # log(mel_spec)
+        spectrogram = torch.log(spectrogram + self.eps) # log(mel_spec)
 
         instance_data = {
             "audio": audio,
