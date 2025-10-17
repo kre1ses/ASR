@@ -1,107 +1,147 @@
-import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.nn.init as init
-
-from .rpe import RelativeSinusoidalPositionEmbedding
+import math
+from typing import Optional, Tuple
 
 class RelativeMultiHeadSelfAttentionBlock(nn.Module):
-    def __init__(self, d_model: int, num_heads: int, attn_dropout_p: float = 0.1):
+    def __init__(self, d_model: int, num_heads: int, attn_dropout_p: float = 0.1, 
+                 layer_norm_eps: float = 1e-5, bias: bool = True):
         super().__init__()
-        "d_model must be divisible by num_heads"
+        
+        assert d_model % num_heads == 0, "d_model must be divisible by num_heads"
         
         self.d_model = d_model
         self.num_heads = num_heads
         self.d_k = d_model // num_heads
-        
-        self.Q = nn.Linear(d_model, d_model, bias=True)
-        init.xavier_uniform_(self.Q.weight)
-        init.zeros_(self.Q.bias)
+        self.d_v = d_model // num_heads
 
-        self.K = nn.Linear(d_model, d_model, bias=True)
-        init.xavier_uniform_(self.K.weight)
-        init.zeros_(self.K.bias)
+        self.q_proj = nn.Linear(d_model, d_model, bias=bias)
+        self.k_proj = nn.Linear(d_model, d_model, bias=bias)
+        self.v_proj = nn.Linear(d_model, d_model, bias=bias)
 
-        self.V= nn.Linear(d_model, d_model, bias=True)
-        init.xavier_uniform_(self.V.weight)
-        init.zeros_(self.V.bias)
-        
-        self.rpe = RelativeSinusoidalPositionEmbedding(d_model)
-        self.rpe_proj = nn.Linear(d_model, d_model, bias=False)
+        self.out_proj = nn.Linear(d_model, d_model, bias=bias)
 
-        self.u_bias = nn.Parameter(torch.Tensor(self.num_heads, self.d_k))
-        self.v_bias = nn.Parameter(torch.Tensor(self.num_heads, self.d_k))
-        torch.nn.init.xavier_uniform_(self.u_bias)
-        torch.nn.init.xavier_uniform_(self.v_bias)
+        max_relative_position = 128
+        self.max_relative_position = max_relative_position
+        self.rel_pos_bias = nn.Parameter(
+            torch.zeros((2 * max_relative_position - 1, num_heads))
+        )
 
-        self.out_proj = nn.Linear(d_model, d_model, bias=True)
-        init.xavier_uniform_(self.out_proj .weight)
-        init.zeros_(self.out_proj .bias)
+        self.input_ln = nn.LayerNorm(d_model, eps=layer_norm_eps)
         
         self.dropout = nn.Dropout(attn_dropout_p)
+        self.attn_dropout = nn.Dropout(attn_dropout_p)
+        
+        self._init_weights()
+    
+    def _init_weights(self):
+        for p in self.parameters():
+            if p.dim() > 1:
+                nn.init.xavier_uniform_(p)
+            elif p.dim() == 1:
+                nn.init.zeros_(p)
+    
+    def _relative_positional_bias(self, seq_len: int) -> torch.Tensor:
+        device = self.rel_pos_bias.device
+
+        range_vec = torch.arange(seq_len, device=device)
+        relative_pos = range_vec[:, None] - range_vec[None, :]
+
+        max_rel_pos = self.max_relative_position
+        relative_pos.clamp_(-max_rel_pos + 1, max_rel_pos - 1)
+
+        rel_pos_indices = relative_pos + max_rel_pos - 1
+
+        rel_pos_bias_gathered = self.rel_pos_bias[rel_pos_indices]
+        
+        rel_pos_bias_gathered = rel_pos_bias_gathered.transpose(0, 2).transpose(1, 2)
+        
+        return rel_pos_bias_gathered
     
     def forward(self, 
                 query: torch.Tensor, 
                 key: torch.Tensor, 
                 value: torch.Tensor,
-                pos_embedding: torch.Tensor, 
-                mask: torch.Tensor = None) -> torch.Tensor:
+                mask: Optional[torch.Tensor] = None,
+                key_padding_mask: Optional[torch.Tensor] = None,
+                attn_mask: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, torch.Tensor]:
         
-        batch_size = query.size(0)
+        batch_size, seq_len, _ = query.shape
+        
+        query = self.input_ln(query)
+        key = self.input_ln(key)
+        value = self.input_ln(value)
+        
+        Q = self.q_proj(query).view(batch_size, seq_len, self.num_heads, self.d_k).transpose(1, 2)
+        K = self.k_proj(key).view(batch_size, seq_len, self.num_heads, self.d_k).transpose(1, 2)
+        V = self.v_proj(value).view(batch_size, seq_len, self.num_heads, self.d_v).transpose(1, 2)
+        
+        scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(self.d_k)
 
-        Q = self.Q(query).view(batch_size, -1, self.num_heads, self.d_k)
-        K = self.K(key).view(batch_size, -1, self.num_heads, self.d_k).transpose(1, 2)
-        V = self.V(value).view(batch_size, -1, self.num_heads, self.d_k).transpose(1, 2)
-        R = self.rpe_proj(pos_embedding).view(batch_size, -1, self.num_heads, self.d_k)
+        rel_pos_bias = self._relative_positional_bias(seq_len)
+        rel_pos_bias = rel_pos_bias.unsqueeze(0)
+        
+        scores = scores + rel_pos_bias.to(scores.device)
+        
+        if attn_mask is not None:
+            scores = scores.masked_fill(attn_mask.unsqueeze(1), float('-inf'))
+        
+        if key_padding_mask is not None:
+            key_padding_mask = key_padding_mask.unsqueeze(1).unsqueeze(2)
+            scores = scores.masked_fill(key_padding_mask, float('-inf'))
+        
+        attn_weights = F.softmax(scores, dim=-1)
+        attn_weights = self.attn_dropout(attn_weights)
+        
+        attn_output = torch.matmul(attn_weights, V)
+        attn_output = attn_output.transpose(1, 2).contiguous().view(
+            batch_size, seq_len, self.d_model
+        )
 
-        main_score = torch.matmul((Q + self.u_bias).transpose(1, 2), K.transpose(2, 3))
-        rpe_score = torch.matmul((Q + self.v_bias).transpose(1, 2), R.transpose(2, 3).transpose(1, 3)) # 0 1 2 3 -> 0 1 3 2 -> 0 2 3 1
-
-        # Shift for correct dims (oh hell nah i hate ts)
-        B, H, T1, T2 = rpe_score.size()
-        zeros = rpe_score.new_zeros(B, H, T1, 1)
-        padded_rpe_score = torch.cat([zeros, rpe_score], dim=-1)
-
-        padded_rpe_score = padded_rpe_score.view(B, H, T2 + 1, T1)
-        rpe_score = padded_rpe_score[:, :, 1:].view_as(rpe_score)[:, :, :, : T2 // 2 + 1]
-
-        scores = (main_score + rpe_score) / math.sqrt(self.d_k)
-
-        if mask is not None:
-            mask = mask.unsqueeze(1).unsqueeze(2)
-            scores.masked_fill_(mask, -1e4)
-
-        scores = F.softmax(scores, dim=-1)
-        scores = self.dropout(scores)
-
-        output = torch.matmul(scores, V)
-        output = output.contiguous().view(batch_size, -1, self.d_model)
-
-        return self.out_proj(output)
+        output = self.out_proj(attn_output)
+        
+        return output, attn_weights
 
 class RelativeMultiHeadSelfAttentionModule(nn.Module):
-    def __init__(self, d_model: int, num_heads: int, p_dropout: float = 0.1):
+    def __init__(self, d_model: int, num_heads: int, p_dropout: float = 0.1, 
+                 layer_norm_eps: float = 1e-5, max_relative_position: int = 128):
         super().__init__()
-
-        self.attention = RelativeMultiHeadSelfAttentionBlock(d_model, num_heads, p_dropout)
-        self.rpe = RelativeSinusoidalPositionEmbedding(d_model)
-        self.dropout = nn.Dropout(p = p_dropout)
-        self.layer_norm = nn.LayerNorm(d_model)
+        
+        self.attention = RelativeMultiHeadSelfAttentionBlock(
+            d_model, num_heads, attn_dropout_p=p_dropout, 
+            layer_norm_eps=layer_norm_eps
+        )
+        self.layer_norm = nn.LayerNorm(d_model, eps=layer_norm_eps)
+        self.dropout = nn.Dropout(p_dropout)
+        self.max_relative_position = max_relative_position
     
-    def forward(self, x: torch.Tensor, output_lenght: torch.Tensor = None) -> torch.Tensor:
-        B, T, D = x.size()
+    def forward(self, x: torch.Tensor, output_length: Optional[torch.Tensor] = None) -> torch.Tensor:
 
+        batch_size, seq_len, _ = x.shape
         device = x.device
-        seq_range = torch.arange(T, device=device)[None, :]  # (1, T)
-
-        output_lenght = output_lenght.to(device)
-        mask = seq_range < output_lenght[:, None] 
-
-        pos_embedding = self.rpe(x)
-        pos_embedding = pos_embedding.repeat(B, 1, 1)
-
-        x = self.layer_norm(x)
-        outputs = self.attention(x, x, x, pos_embedding=pos_embedding, mask=mask)
-
-        return self.dropout(outputs)
+        
+        attn_mask = None
+        key_padding_mask = None
+        
+        if output_length is not None:
+            causal_mask = torch.triu(
+                torch.ones(seq_len, seq_len, device=device, dtype=torch.bool), 
+                diagonal=1
+            )
+            attn_mask = causal_mask.unsqueeze(0)
+            
+            seq_range = torch.arange(seq_len, device=device)
+            key_padding_mask = seq_range[None, :] >= output_length[:, None].to(device)
+        
+        residual = x
+        attn_output, attn_weights = self.attention(
+            x, x, x,
+            attn_mask=attn_mask,
+            key_padding_mask=key_padding_mask
+        )
+        
+        output = self.layer_norm(attn_output + residual)
+        output = self.dropout(output)
+        
+        return output
