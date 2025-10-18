@@ -1,5 +1,5 @@
 _target_: src.model.conformer.model.Conformer
-n_tokens: 128
+# n_tokens: 128
 input_dim: 80
 encoder_dim: 176
 input_dropout_p: 0.1
