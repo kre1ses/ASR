@@ -158,6 +158,10 @@ class BaseTrainer:
         if config.trainer.get("from_pretrained") is not None:
             self._from_pretrained(config.trainer.get("from_pretrained"))
 
+        self.grad_acum_steps = config.trainer.get("grad_acum_steps")
+        if self.grad_acum_steps == None:
+            self.grad_acum_steps = 1
+
     def train(self):
         """
         Wrapper around training process to save model on keyboard interrupt.
@@ -259,9 +263,6 @@ class BaseTrainer:
                 # because we are interested in recent train metrics
                 last_train_metrics = self.train_metrics.result()
                 self.train_metrics.reset()
-
-                # self.train_metrics.reset()
-
             if batch_idx + 1 >= self.epoch_len:
                 break
 
