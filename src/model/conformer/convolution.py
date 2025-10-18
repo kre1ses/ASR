@@ -69,7 +69,7 @@ class ConvModule(nn.Module):
             PointWiseConv(in_channels, in_channels, 1),
             nn.Dropout(p=dropout_p),
         )
-        register_gradient_hooks(self, name_prefix="ConvModule")
+        # register_gradient_hooks(self, name_prefix="ConvModule")
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # print(x.shape)
