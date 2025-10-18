@@ -94,7 +94,8 @@ class Trainer(BaseTrainer):
             self._clip_grad_norm()
 
             if (batch_idx + 1) % self.grad_acum_steps == 0:
-                log_gradient_norms(self.model)
+                if (batch_idx + 1) % 20 == 0:
+                    log_gradient_norms(self.model)
                 self.optimizer.step()
 
                 self.lr_scheduler.step()
