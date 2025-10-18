@@ -106,7 +106,7 @@ class Conv2dSubsampling(nn.Module):
         init.zeros_(self.linear.bias)
 
         self.dropout = nn.Dropout(p = p_dropout)
-        register_gradient_hooks(self, name_prefix="SampleModule")
+        # register_gradient_hooks(self, name_prefix="SampleModule")
     
     def forward(self, x: torch.Tensor, input_lengths: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         x = x.unsqueeze(1)  # (batch_size, 1, seq_len, freq)

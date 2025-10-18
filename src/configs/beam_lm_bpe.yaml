@@ -38,3 +38,4 @@ trainer:
   use_accelerate: True
   fp16: True
   max_grad_norm: 5
+  grad_acum_steps: 4

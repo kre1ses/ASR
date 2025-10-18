@@ -36,7 +36,8 @@ class RelativeMultiHeadSelfAttentionBlock(nn.Module):
         
         self.d_model = d_model
         self.num_heads = num_heads
-        self.d_k = d_model // num_heads
+        # self.d_k = d_model // num_heads
+        self.d_k = 1
         
         self.Q = nn.Linear(d_model, d_model, bias=True)
         init.xavier_uniform_(self.Q.weight)
@@ -111,7 +112,7 @@ class RelativeMultiHeadSelfAttentionModule(nn.Module):
         self.rpe = RelativeSinusoidalPositionEmbedding(d_model)
         self.dropout = nn.Dropout(p = p_dropout)
         self.layer_norm = nn.LayerNorm(d_model)
-        register_gradient_hooks(self, name_prefix="AttentionModule")
+        # register_gradient_hooks(self, name_prefix="AttentionModule")
     
     def forward(self, x: torch.Tensor, output_lenght: torch.Tensor = None) -> torch.Tensor:
         B, T, D = x.size()

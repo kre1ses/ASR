@@ -41,7 +41,7 @@ class FeedForwardModule(nn.Module):
             nn.Linear(encoder_dim * expansion_factor, encoder_dim, bias=True),
             nn.Dropout(p=dropout_p),
         )
-        register_gradient_hooks(self, name_prefix="FeedForwardModule")
+        # register_gradient_hooks(self, name_prefix="FeedForwardModule")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.sequential(x)
