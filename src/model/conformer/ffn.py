@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.init as init
 
 def register_gradient_hooks(module: nn.Module, name_prefix: str = ""):
     """
@@ -33,15 +34,32 @@ class FeedForwardModule(nn.Module):
             dropout_p: float = 0.1,
     ) -> None:
         super().__init__()
-        self.sequential = nn.Sequential(
-            nn.LayerNorm(encoder_dim),
-            nn.Linear(encoder_dim, encoder_dim * expansion_factor, bias=True),
-            nn.SiLU(),
-            nn.Dropout(p=dropout_p),
-            nn.Linear(encoder_dim * expansion_factor, encoder_dim, bias=True),
-            nn.Dropout(p=dropout_p),
-        )
+        # self.sequential = nn.Sequential(
+        #     nn.LayerNorm(encoder_dim),
+        #     nn.Linear(encoder_dim, encoder_dim * expansion_factor, bias=True),
+        #     nn.SiLU(),
+        #     nn.Dropout(p=dropout_p),
+        #     nn.Linear(encoder_dim * expansion_factor, encoder_dim, bias=True),
+        #     nn.Dropout(p=dropout_p),
+        # )
         # register_gradient_hooks(self, name_prefix="FeedForwardModule")
+        self.norm_1 = nn.LayerNorm(encoder_dim)
+        self.linear_1 = nn.Linear(encoder_dim, encoder_dim * expansion_factor, bias=True)
+        init.xavier_uniform_(self.linear_1.weight)
+        init.zeros_(self.linear_1.bias)
+        self.silu = nn.SiLU()
+        self.dropout_1 = nn.Dropout(p=dropout_p)
+        self.linear_2 = nn.Linear(encoder_dim * expansion_factor, encoder_dim, bias=True)
+        init.xavier_uniform_(self.linear_2.weight)
+        init.zeros_(self.linear_2.bias)
+        self.dropout_2 = nn.Dropout(p=dropout_p)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.sequential(x)
+        x = self.norm_1(x)
+        x = self.linear_1(x)
+        x = self.silu(x)
+        x = self.dropout_1(x)
+        x = self.linear_2(x)
+        x = self.dropout_2(x)
+
+        return x

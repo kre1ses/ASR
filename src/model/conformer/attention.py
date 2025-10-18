@@ -52,6 +52,7 @@ class RelativeMultiHeadSelfAttentionBlock(nn.Module):
         
         self.rpe = RelativeSinusoidalPositionEmbedding(d_model)
         self.rpe_proj = nn.Linear(d_model, d_model, bias=False)
+        init.xavier_uniform_(self.rpe_proj .weight)
 
         self.u_bias = nn.Parameter(torch.Tensor(self.num_heads, self.d_k))
         self.v_bias = nn.Parameter(torch.Tensor(self.num_heads, self.d_k))
@@ -89,7 +90,7 @@ class RelativeMultiHeadSelfAttentionBlock(nn.Module):
         padded_rpe_score = padded_rpe_score.view(B, H, T2 + 1, T1)
         rpe_score = padded_rpe_score[:, :, 1:].view_as(rpe_score)[:, :, :, : T2 // 2 + 1]
 
-        scores = (main_score + rpe_score) / math.sqrt(self.d_k)
+        scores = (main_score + rpe_score) / math.sqrt(self.d_k * 0.1)
 
         if mask is not None:
             mask = mask.unsqueeze(1).unsqueeze(2)
