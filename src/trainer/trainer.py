@@ -12,7 +12,7 @@ from accelerate import Accelerator
 import torch
 
 # === Утилита: сбор и печать статистики градиентов ===
-def get_module_grad_stats(model: nn.Module):
+def get_module_grad_stats(model: torch.nn.Module):
     stats = []
     for name, module in model.named_modules():
         total_norm = 0.0
