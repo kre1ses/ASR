@@ -93,7 +93,7 @@ class Trainer(BaseTrainer):
             loss.backward()
             total_norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
             with torch.no_grad():
-                print("max encoder input:", self.model.encoder.conv_subsample(...)[0].abs().max())
+                print("max encoder input:", self.model.encoder.conv_subsample(batch['spectrogram'], batch['spectrogram_lengths'])[0].abs().max())
             print(f"Global grad norm: {total_norm}")
             self._clip_grad_norm()
 
