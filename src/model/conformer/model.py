@@ -44,6 +44,7 @@ class Conformer(nn.Module):
         self.linear = nn.Linear(encoder_dim, n_tokens, bias=False)
         init.xavier_uniform_(self.linear.weight)
 
+
     def forward(
             self, 
             spectrogram: torch.Tensor, 
@@ -59,3 +60,6 @@ class Conformer(nn.Module):
             'log_probs_length': log_probs_length
         }
         return d
+    
+    def count_parameters(self) -> int:
+        return sum([p.numel() for p in self.parameters()])

@@ -53,6 +53,9 @@ def main(config):
 
     # build model architecture, then print to console
     model = instantiate(config.model, n_tokens=len(text_encoder)).to(device)
+    def count_parameters(model):
+        return sum(p.numel() for p in model.parameters() if p.requires_grad)
+    logger.info(f"Number of trainable parameters: {count_parameters(model):,}")
     logger.info(model)
 
     # get function handles of loss and metrics

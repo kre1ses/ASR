@@ -94,7 +94,7 @@ class Conv2dSubsampling(nn.Module):
 
         # output_lengths = input_lengths >> 2
         # output_lengths -= 1
-        output_lengths = torch.floor((input_lengths - 3) / 2 + 1)
-        output_lengths = torch.floor((output_lengths - 3) / 2 + 1)
+        output_lengths = torch.floor((input_lengths - 3) / 2 + 1).to(torch.long)
+        output_lengths = torch.floor((output_lengths - 3) / 2 + 1).to(torch.long)
 
         return x, output_lengths

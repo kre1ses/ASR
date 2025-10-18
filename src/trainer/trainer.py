@@ -52,7 +52,8 @@ class Trainer(BaseTrainer):
             all_losses = self.criterion(**batch)
             batch.update(all_losses)
 
-            batch["loss"].backward()
+            loss = batch["loss"] / self.grad_accum_steps
+            loss.backward()
             self._clip_grad_norm()
 
             if (batch_idx + 1) % 4 == 0:
