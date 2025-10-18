@@ -11,6 +11,43 @@ from torch.cuda.amp import GradScaler, autocast
 from accelerate import Accelerator
 import torch
 
+# === Утилита: сбор и печать статистики градиентов ===
+def get_module_grad_stats(model: torch.nn.Module):
+    stats = []
+    for name, module in model.named_modules():
+        total_norm = 0.0
+        n_params = 0
+        has_nan = False
+        for p in module.parameters(recurse=False):
+            if p.grad is None:
+                continue
+            g = p.grad.detach()
+            total_norm += g.norm().item() ** 2
+            n_params += 1
+            if torch.isnan(g).any() or torch.isinf(g).any():
+                has_nan = True
+        if n_params > 0:
+            stats.append((name, total_norm ** 0.5, has_nan))
+    return stats
+
+
+def log_gradient_norms(model: torch.nn.Module, top_k: int = 20):
+    stats = get_module_grad_stats(model)
+    if not stats:
+        print("No gradients found.")
+        return
+
+    # Отсортируем по величине нормы (по убыванию)
+    stats = sorted(stats, key=lambda x: x[1], reverse=True)
+
+    print("\n╭──────────────────────────────────────────────╮")
+    print("│ Gradient Norms per Module                   │")
+    print("├────────────────────────────┬────────────┬────┤")
+    print("│ Module                    │ Grad Norm  │ NaN│")
+    print("├────────────────────────────┼────────────┼────┤")
+    for name, norm, has_nan in stats[:top_k]:
+        print(f"│ {name[:26]:26s} │ {norm:10.3e} │ {'Yes' if has_nan else 'No '}│")
+    print("╰────────────────────────────┴────────────┴────╯\n")
 
 class Trainer(BaseTrainer):
     """
@@ -42,7 +79,7 @@ class Trainer(BaseTrainer):
         metric_funcs = self.metrics["inference"]
         if self.is_train:
             metric_funcs = self.metrics["train"]
-            if (batch_idx + 1) % 4 == 0:
+            if (batch_idx + 1) % self.grad_acum_steps == 0:
                 self.optimizer.zero_grad()
         
         if self.is_train:
@@ -52,10 +89,13 @@ class Trainer(BaseTrainer):
             all_losses = self.criterion(**batch)
             batch.update(all_losses)
 
-            batch["loss"].backward()
+            loss = batch["loss"] / self.grad_acum_steps
+            loss.backward()
             self._clip_grad_norm()
 
-            if (batch_idx + 1) % 4 == 0:
+            if (batch_idx + 1) % self.grad_acum_steps == 0:
+                if (batch_idx + 1) % 20 == 0:
+                    log_gradient_norms(self.model)
                 self.optimizer.step()
 
                 self.lr_scheduler.step()
