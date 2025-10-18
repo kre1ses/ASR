@@ -93,7 +93,7 @@ class RelativeMultiHeadSelfAttentionBlock(nn.Module):
 
         if mask is not None:
             mask = mask.unsqueeze(1).unsqueeze(2)
-            scores = scores.masked_fill(mask, 1e-9) 
+            scores = scores.masked_fill(mask, -1e-9) 
 
         scores = F.softmax(scores, dim=-1)
         scores = self.dropout(scores)
@@ -126,8 +126,8 @@ class RelativeMultiHeadSelfAttentionModule(nn.Module):
         pos_embedding = self.rpe(x)
         pos_embedding = pos_embedding.repeat(B, 1, 1)
 
-        # x = self.layer_norm(x)
+        x = self.layer_norm(x)
         outputs = self.attention(x, x, x, pos_embedding=pos_embedding, mask=mask)
-        outputs = self.layer_norm(outputs)
+        # outputs = self.layer_norm(outputs)
 
         return self.dropout(outputs)
