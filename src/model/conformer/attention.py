@@ -96,7 +96,8 @@ class RelativeMultiHeadSelfAttentionModule(nn.Module):
         seq_range = torch.arange(T, device=device)[None, :]  # (1, T)
 
         output_lenght = output_lenght.to(device)
-        mask = seq_range < output_lenght[:, None] 
+        mask = seq_range < output_lenght[:, None]
+        mask = ~mask   
 
         pos_embedding = self.rpe(x)
         pos_embedding = pos_embedding.repeat(B, 1, 1)

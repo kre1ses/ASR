@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.init as init
+import math
 
 class DepthWiseConv(nn.Module):
     def __init__(self, in_channels: int, out_channels: int, kernel_size: int = 3):
@@ -91,7 +92,9 @@ class Conv2dSubsampling(nn.Module):
         x = self.linear(x)
         x = self.dropout(x)
 
-        output_lengths = input_lengths >> 2
-        output_lengths -= 1
+        # output_lengths = input_lengths >> 2
+        # output_lengths -= 1
+        output_lengths = math.floor((input_lengths - 3) / 2 + 1)
+        output_lengths = torch.floor((output_lengths - 3) / 2 + 1)
 
         return x, output_lengths
