@@ -31,7 +31,7 @@ def get_module_grad_stats(model: torch.nn.Module):
     return stats
 
 
-def log_gradient_norms(model: nn.Module, top_k: int = 20):
+def log_gradient_norms(model: torch.nn.Module, top_k: int = 20):
     stats = get_module_grad_stats(model)
     if not stats:
         print("No gradients found.")
