@@ -34,7 +34,13 @@ def collate_fn(dataset_items: list[dict]):
     batch_text_encoded = torch.zeros((batch_size, max_text_length))
 
     for i in range(batch_size):
-        batch_spectrogram[i, :, :lengths[i]] = dataset_items[i]['spectrogram'][0]
+        # batch_spectrogram[i, :, :lengths[i]] = dataset_items[i]['spectrogram'][0]
+        spec = dataset_items[i]['spectrogram'][0]
+
+        mean = spec.mean()
+        std = spec.std()
+        spec = (spec - mean) / (std + 1e-5)
+        batch_spectrogram[i, :, :lengths[i]] = spec
         batch_text_encoded[i, :text_encoded_lengths[i]] = dataset_items[i]['text_encoded'][0]
     
     result = {
