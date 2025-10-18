@@ -70,7 +70,7 @@ class RelativeMultiHeadSelfAttentionBlock(nn.Module):
 
         if mask is not None:
             mask = mask.unsqueeze(1).unsqueeze(2)
-            scores.masked_fill_(mask, -1e4)
+            scores = scores.masked_fill(mask, 1e-4) 
 
         scores = F.softmax(scores, dim=-1)
         scores = self.dropout(scores)
@@ -96,8 +96,8 @@ class RelativeMultiHeadSelfAttentionModule(nn.Module):
         seq_range = torch.arange(T, device=device)[None, :]  # (1, T)
 
         output_lenght = output_lenght.to(device)
-        mask = seq_range < output_lenght[:, None]
-        mask = ~mask   
+        mask = seq_range >= output_lenght[:, None]
+        # mask = mask.unsqueeze(1)  # (B, 1, T)
 
         pos_embedding = self.rpe(x)
         pos_embedding = pos_embedding.repeat(B, 1, 1)
