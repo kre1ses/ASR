@@ -11,7 +11,6 @@ from torch.cuda.amp import GradScaler, autocast
 from accelerate import Accelerator
 import torch
 
-# === Утилита: сбор и печать статистики градиентов ===
 def get_module_grad_stats(model: torch.nn.Module):
     stats = []
     for name, module in model.named_modules():
@@ -37,7 +36,6 @@ def log_gradient_norms(model: torch.nn.Module, top_k: int = 20):
         print("No gradients found.")
         return
 
-    # Отсортируем по величине нормы (по убыванию)
     stats = sorted(stats, key=lambda x: x[1], reverse=True)
 
     print("\n╭──────────────────────────────────────────────╮")
@@ -91,10 +89,12 @@ class Trainer(BaseTrainer):
 
             loss = batch["loss"] / self.grad_acum_steps
             loss.backward()
+            total_norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
+            print(f"Global grad norm: {total_norm}")
             self._clip_grad_norm()
 
             if (batch_idx + 1) % self.grad_acum_steps == 0:
-                if (batch_idx + 1) % 20 == 0:
+                if (batch_idx + 1) % 40 == 0:
                     log_gradient_norms(self.model)
                 self.optimizer.step()
 

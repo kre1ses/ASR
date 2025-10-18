@@ -4,12 +4,12 @@ train:
     sample_rate: 16000
     n_mels: 80
   spectrogram: # name of the tensor on which we apply transform
-    _target_: torch.nn.Sequential # to apply several transforms sequentially
-    _args_:
-      - _target_: src.transforms.spec_augs.FrequencyMasking
-        freq_mask_param: 10
-      - _target_: src.transforms.spec_augs.TimeMasking
-        time_mask_param: 10
+    # _target_: torch.nn.Sequential # to apply several transforms sequentially
+    # _args_:
+    #   - _target_: src.transforms.spec_augs.FrequencyMasking
+    #     freq_mask_param: 10
+    #   - _target_: src.transforms.spec_augs.TimeMasking
+    #     time_mask_param: 10
   audio: # name of the tensor on which we apply transform
     _target_: torch.nn.Sequential # to apply several transforms sequentially
     _args_:
@@ -18,14 +18,14 @@ train:
         max_gain_in_db: 10.0
         p: 0.2
       - _target_: src.transforms.wav_augs.AddColoredNoise
-        sample_rate: 15000
+        sample_rate: 16000
         p: 0.2
       # - _target_: src.transforms.wav_augs.PolarityInversion
       #   p: 0.2
       - _target_: src.transforms.wav_augs.PeakNormalization
         p: 1.0
       - _target_: src.transforms.wav_augs.PitchShift
-        sample_rate: 20000
+        sample_rate: 16000
         p: 0.2
 inference:
   get_spectrogram:
