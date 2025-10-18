@@ -3,6 +3,29 @@ import torch.nn as nn
 import torch.nn.init as init
 import math
 
+def register_gradient_hooks(module: nn.Module, name_prefix: str = ""):
+    """
+    Регистрирует backward-хуки для всех параметров модуля,
+    чтобы логировать норму, NaN и Inf в градиентах.
+    """
+    for name, param in module.named_parameters():
+        if param.requires_grad:
+            full_name = f"{name_prefix}.{name}" if name_prefix else name
+
+            def hook(grad, pname=full_name):
+                if grad is None:
+                    print(f"[grad_logger] {pname}: grad=None")
+                    return
+                grad_norm = grad.norm().item()
+                has_nan = torch.isnan(grad).any().item()
+                has_inf = torch.isinf(grad).any().item()
+                print(
+                    f"[grad_logger] {pname:60s} | norm={grad_norm:10.3e} "
+                    f"| NaN={has_nan} | Inf={has_inf}"
+                )
+
+            param.register_hook(hook)
+
 class DepthWiseConv(nn.Module):
     def __init__(self, in_channels: int, out_channels: int, kernel_size: int = 3):
         super().__init__()
@@ -46,6 +69,7 @@ class ConvModule(nn.Module):
             PointWiseConv(in_channels, in_channels, 1),
             nn.Dropout(p=dropout_p),
         )
+        register_gradient_hooks(self, name_prefix="ConvModule")
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # print(x.shape)
@@ -82,6 +106,7 @@ class Conv2dSubsampling(nn.Module):
         init.zeros_(self.linear.bias)
 
         self.dropout = nn.Dropout(p = p_dropout)
+        register_gradient_hooks(self, name_prefix="SampleModule")
     
     def forward(self, x: torch.Tensor, input_lengths: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         x = x.unsqueeze(1)  # (batch_size, 1, seq_len, freq)

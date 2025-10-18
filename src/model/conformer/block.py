@@ -59,9 +59,9 @@ class ConformerBlock(nn.Module):
         self.layer_norm = nn.LayerNorm(encoder_dim)
 
     def forward(self, x: torch.Tensor, output_lengths) -> torch.Tensor:
-        x = self.ffn_1(x) + x
-        x = self.mhsa(x, output_lengths) + x + x
-        x = self.conv(x) + x
-        x = self.ffn_2(x) + x
+        x = self.ffn_1(x)
+        x = self.mhsa(x, output_lengths) + x
+        x = self.conv(x)
+        x = self.ffn_2(x)
         x = self.layer_norm(x)
         return x
