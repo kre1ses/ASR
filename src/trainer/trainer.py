@@ -31,14 +31,14 @@ def get_module_grad_stats(model: torch.nn.Module):
     return stats
 
 
-def log_gradient_norms(model: torch.nn.Module, top_k: int = 20):
+def log_gradient_norms(model: torch.nn.Module, top_k: int = 40):
     stats = get_module_grad_stats(model)
     if not stats:
         print("No gradients found.")
         return
 
     # Отсортируем по величине нормы (по убыванию)
-    stats = sorted(stats, key=lambda x: x[1], reverse=True)
+    stats = sorted(stats, key=lambda x: x[1], reverse=False)
 
     print("\n╭──────────────────────────────────────────────╮")
     print("│ Gradient Norms per Module                   │")
@@ -94,7 +94,7 @@ class Trainer(BaseTrainer):
             self._clip_grad_norm()
 
             if (batch_idx + 1) % self.grad_acum_steps == 0:
-                if (batch_idx + 1) % 20 == 0:
+                if (batch_idx + 1) % 40 == 0:
                     log_gradient_norms(self.model)
                 self.optimizer.step()
 

@@ -29,7 +29,7 @@ class ConformerBlock(nn.Module):
                     expansion_factor=ffn_expansion_factor,
                     dropout_p=ffn_dropout_p,
                 ),
-                module_factor = 0.5,
+                module_factor = 1,
             )
         
         self.mhsa = RelativeMultiHeadSelfAttentionModule(
@@ -53,7 +53,7 @@ class ConformerBlock(nn.Module):
                     expansion_factor=ffn_expansion_factor,
                     dropout_p=ffn_dropout_p,
                 ),
-                module_factor = 0.5,
+                module_factor = 1,
             )
         
         self.layer_norm = nn.LayerNorm(encoder_dim)
