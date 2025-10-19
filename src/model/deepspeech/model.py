@@ -53,9 +53,9 @@ class DeepSpeechV2Model(nn.Module):
             **batch
             ) -> tuple[torch.Tensor, torch.Tensor]:
         
-        spectrogram = torch.unsqueeze(spectrogram, 1)
-        # spectrogram = spectrogram.transpose(2, 3)
-        conv_out = self.convs(spectrogram.transpose(2, 3))
+        spectrogram = torch.unsqueeze(spectrogram, 1).squeeze(0)
+        spectrogram = spectrogram.transpose(2, 3)
+        conv_out = self.convs(spectrogram.transpose(0, 1))
         conv_out = conv_out.view(conv_out.shape[0], conv_out.shape[2], -1)
         rnn_out = self.rnn(conv_out)
         output = self.linear(rnn_out)
