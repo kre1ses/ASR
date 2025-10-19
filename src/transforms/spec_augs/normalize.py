@@ -10,6 +10,7 @@ class Normalize1D(nn.Module):
         self.eps = eps
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = x.unsqueeze(1)
         x = (x - self.mean) / (self.std + self.eps)
 
         return x.squeeze(1)
