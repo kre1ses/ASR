@@ -100,6 +100,8 @@ class Trainer(BaseTrainer):
 
                 self.lr_scheduler.step()
         else:
+            print(batch['spectrogram'].shape)
+            batch['spectrogram'] = batch['spectrogram'].unsqueeze(0)
             outputs = self.model(**batch)
             batch.update(outputs)
             all_losses = self.criterion(**batch)
@@ -143,8 +145,10 @@ class Trainer(BaseTrainer):
             self.log_predictions(**batch)
 
     def log_spectrogram(self, spectrogram, **batch):
-        spectrogram_for_plot = spectrogram[0].detach().cpu()
+        print(spectrogram.shape)
+        spectrogram_for_plot = spectrogram[0, 3].detach().cpu()
         # image = plot_spectrogram(spectrogram_for_plot.transpose(-2,-1))
+        print(spectrogram_for_plot.shape)
         image = plot_spectrogram(spectrogram_for_plot)
         self.writer.add_image("spectrogram", image)
 
