@@ -1,17 +1,17 @@
 defaults:
-  - model: default_ctc
+  - model: deepspeech
   - metrics: example
-  - datasets: one_batch_test_norm
-  - dataloader: example
-  - transforms: first_run_only_inst
+  - datasets: final_dataset
+  - dataloader: 64_size
+  - transforms: example
   - _self_
 text_encoder:
   _target_: src.text_encoder.CTCTextEncoder
   beam_use: True
-  lm_use: True
-  bpe_use: True
+  lm_use: False
+  bpe_use: False
   vocab_size: 128
-  beam_size: 5
+  beam_size: 3
 inferencer:
   device_tensors: ["spectrogram", "text_encoded"] # which tensors should be on device (ex. GPU)
   device: auto # device name or "auto"
